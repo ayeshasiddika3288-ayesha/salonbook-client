@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import RoleGuard from "@/components/RoleGuard";
 import { authenticatedFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 
@@ -89,10 +87,8 @@ function CustomerDashboardContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#faf7f2]">
-      <Navbar />
-
-      <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+    <div>
+      <main>
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#a17a50]">
@@ -208,18 +204,10 @@ function CustomerDashboardContent() {
           </Link>
         </section>
       </main>
-
-      <footer className="bg-[#29231f] px-5 py-7 text-center text-sm text-[#c7bbb0]">
-        © 2026 SalonBook. All rights reserved.
-      </footer>
     </div>
   );
 }
 
 export default function CustomerDashboard() {
-  return (
-    <RoleGuard allowedRole="customer">
-      <CustomerDashboardContent />
-    </RoleGuard>
-  );
+  return <CustomerDashboardContent />;
 }

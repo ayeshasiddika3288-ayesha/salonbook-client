@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import RoleGuard from "@/components/RoleGuard";
 import { authenticatedFetch } from "@/lib/api";
 
 interface DashboardStats {
@@ -123,10 +121,8 @@ function AdminDashboardContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#faf7f2] text-[#29231f]">
-      <Navbar />
-
-      <main className="mx-auto max-w-7xl px-5 py-12">
+    <div>
+      <main>
         <div className="mb-10">
           <p className="font-semibold uppercase tracking-widest text-[#8b5e3c]">
             SalonBook Administration
@@ -213,9 +209,5 @@ function AdminDashboardContent() {
 }
 
 export default function AdminDashboardPage() {
-  return (
-    <RoleGuard allowedRole="admin">
-      <AdminDashboardContent />
-    </RoleGuard>
-  );
+  return <AdminDashboardContent />;
 }

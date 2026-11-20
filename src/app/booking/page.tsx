@@ -4,6 +4,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { useSession, authClient } from "@/lib/auth-client";
 
@@ -62,16 +63,19 @@ function BookingContent() {
 
     if (!serviceId) {
       setError("Service information is missing. Please select a service first.");
+      toast.error("Service information is missing.");
       return;
     }
 
     if (!date || !timeSlot) {
       setError("Please select an appointment date and time.");
+      toast.error("Please select an appointment date and time.");
       return;
     }
 
     if (new Date(`${date}T00:00:00`) < new Date(new Date().toDateString())) {
       setError("Please select today or a future date.");
+      toast.error("Please select today or a future date.");
       return;
     }
 
@@ -108,16 +112,18 @@ function BookingContent() {
       setSuccess(
         result.message || "Your appointment request has been submitted successfully!"
       );
+      toast.success("Appointment request submitted successfully.");
 
       setDate("");
       setTimeSlot("");
       setMessage("");
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Something went wrong. Please try again."
-      );
+          : "Something went wrong. Please try again.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -240,10 +246,6 @@ function BookingContent() {
           </form>
         </div>
       </main>
-
-      <footer className="border-t border-[#e9dfd4] py-6 text-center text-sm text-[#8b8178]">
-        © 2026 SalonBook. All rights reserved.
-      </footer>
     </div>
   );
 }

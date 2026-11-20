@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import RoleGuard from "@/components/RoleGuard";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { authenticatedFetch } from "@/lib/api";
 
 interface Customer {
@@ -11,6 +10,7 @@ interface Customer {
   name: string;
   email: string;
   image?: string;
+  phone?: string;
   role: string;
   isBlocked: boolean;
   createdAt?: string | null;
@@ -21,7 +21,7 @@ function AdminCustomersContent() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState("");
+  const [blockTarget, setBlockTarget] = useState<Customer | null>(null);
   const [error, setError] = useState("");
 
   const fetchCustomers = useCallback(async () => {
@@ -38,9 +38,10 @@ function AdminCustomersContent() {
 
       setCustomers(result.data || []);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -50,20 +51,14 @@ function AdminCustomersContent() {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const toggleBlock = async (customer: Customer) => {
-    const action = customer.isBlocked ? "unblock" : "block";
+  const confirmToggleBlock = async () => {
+    if (!blockTarget) return;
 
-    if (
-      !window.confirm(
-        `Are you sure you want to ${action} ${customer.name}?`
-      )
-    ) {
-      return;
-    }
+    const customer = blockTarget;
+    const action = customer.isBlocked ? "unblock" : "block";
 
     try {
       setUpdatingId(customer._id);
-      setMessage("");
       setError("");
 
       const response = await authenticatedFetch(
@@ -77,15 +72,16 @@ function AdminCustomersContent() {
         throw new Error(result.message || "Could not update customer.");
       }
 
-      setMessage(
+      toast.success(
         customer.isBlocked
           ? "Customer unblocked successfully."
           : "Customer blocked successfully."
       );
 
+      setBlockTarget(null);
       await fetchCustomers();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Something went wrong."
       );
     } finally {
@@ -110,36 +106,19 @@ function AdminCustomersContent() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-[#faf7f2] text-[#29231f]">
-      <Navbar />
-
-      <main className="mx-auto max-w-7xl px-5 py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-semibold uppercase tracking-widest text-[#8b5e3c]">
-              Administration
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-[#684329] md:text-4xl">
-              Manage Customers
-            </h1>
-            <p className="mt-3 text-[#8b8178]">
-              Review registered customers and block or unblock accounts.
-            </p>
-          </div>
-
-          <Link
-            href="/dashboard/admin"
-            className="rounded-lg border border-[#d8c8b8] px-5 py-3 text-sm font-semibold text-[#684329] hover:bg-white"
-          >
-            ← Back to Dashboard
-          </Link>
+    <div>
+      <main>
+        <div className="mb-8">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#a17a50]">
+            Administration
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-[#684329] md:text-4xl">
+            Manage Customers
+          </h1>
+          <p className="mt-3 text-sm text-[#766e67]">
+            Review registered customers and block or unblock accounts.
+          </p>
         </div>
-
-        {message && (
-          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            {message}
-          </div>
-        )}
 
         {error && (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -201,6 +180,7 @@ function AdminCustomersContent() {
                 <tr>
                   <th className="p-4">Customer</th>
                   <th className="p-4">Email</th>
+                  <th className="p-4">Phone</th>
                   <th className="p-4">Joined</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Action</th>
@@ -238,6 +218,8 @@ function AdminCustomersContent() {
 
                     <td className="p-4 break-all">{customer.email}</td>
 
+                    <td className="p-4">{customer.phone || "—"}</td>
+
                     <td className="p-4">
                       {customer.createdAt
                         ? new Date(customer.createdAt).toLocaleDateString(
@@ -266,7 +248,7 @@ function AdminCustomersContent() {
                     <td className="p-4 text-right">
                       <button
                         type="button"
-                        onClick={() => toggleBlock(customer)}
+                        onClick={() => setBlockTarget(customer)}
                         disabled={updatingId === customer._id}
                         className={`rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50 ${
                           customer.isBlocked
@@ -288,14 +270,29 @@ function AdminCustomersContent() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={Boolean(blockTarget)}
+        title={
+          blockTarget?.isBlocked
+            ? "Unblock this customer?"
+            : "Block this customer?"
+        }
+        description={
+          blockTarget?.isBlocked
+            ? `${blockTarget?.name} will be able to sign in and book appointments again.`
+            : `${blockTarget?.name} will be signed out immediately and will no longer be able to book appointments.`
+        }
+        confirmLabel={blockTarget?.isBlocked ? "Unblock" : "Block"}
+        destructive={!blockTarget?.isBlocked}
+        busy={Boolean(updatingId)}
+        onConfirm={confirmToggleBlock}
+        onCancel={() => setBlockTarget(null)}
+      />
     </div>
   );
 }
 
 export default function AdminCustomersPage() {
-  return (
-    <RoleGuard allowedRole="admin">
-      <AdminCustomersContent />
-    </RoleGuard>
-  );
+  return <AdminCustomersContent />;
 }

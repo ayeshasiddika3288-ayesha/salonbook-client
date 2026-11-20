@@ -2,8 +2,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Navbar from "@/components/Navbar";
-import RoleGuard from "@/components/RoleGuard";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { authenticatedFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -55,8 +55,9 @@ function AdminServicesContent() {
   const [imagePreview, setImagePreview] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchServices = async () => {
     try {
@@ -75,9 +76,10 @@ function AdminServicesContent() {
 
       setServices(result.data || []);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -135,7 +137,6 @@ function AdminServicesContent() {
 
     try {
       setSaving(true);
-      setMessage("");
       setError("");
 
       let imageUrl = form.image;
@@ -171,7 +172,7 @@ function AdminServicesContent() {
         throw new Error(result.message || "Could not save service.");
       }
 
-      setMessage(
+      toast.success(
         editingId
           ? "Service updated successfully."
           : "New service added successfully."
@@ -180,7 +181,7 @@ function AdminServicesContent() {
       resetForm();
       await fetchServices();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Something went wrong."
       );
     } finally {
@@ -203,25 +204,20 @@ function AdminServicesContent() {
 
     setImageFile(null);
     setImagePreview(service.image);
-    setMessage("");
     setError("");
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this service?"
-    );
-
-    if (!confirmed) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
 
     try {
-      setMessage("");
+      setDeleting(true);
       setError("");
 
       const response = await authenticatedFetch(
-        `/api/services/${id}`,
+        `/api/services/${deleteTarget._id}`,
         { method: "DELETE" }
       );
 
@@ -231,18 +227,20 @@ function AdminServicesContent() {
         throw new Error(result.message || "Could not delete service.");
       }
 
-      setMessage("Service deleted successfully.");
+      toast.success("Service deleted successfully.");
+      setDeleteTarget(null);
       await fetchServices();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Something went wrong."
       );
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleStatusChange = async (service: Service) => {
     try {
-      setMessage("");
       setError("");
 
       const newStatus =
@@ -262,37 +260,29 @@ function AdminServicesContent() {
         throw new Error(result.message || "Could not update status.");
       }
 
-      setMessage(`Service is now ${newStatus}.`);
+      toast.success(`Service is now ${newStatus}.`);
       await fetchServices();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Something went wrong."
       );
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#faf7f2] text-[#29231f]">
-      <Navbar />
-
-      <main className="mx-auto max-w-7xl px-5 py-10">
+    <div>
+      <main>
         <div className="mb-8">
-          <p className="font-semibold uppercase tracking-widest text-[#8b5e3c]">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#a17a50]">
             Administration
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[#684329] md:text-4xl">
             Manage Services
           </h1>
-          <p className="mt-3 text-[#8b8178]">
+          <p className="mt-3 text-sm text-[#766e67]">
             Add, edit, delete and manage salon services.
           </p>
         </div>
-
-        {message && (
-          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            {message}
-          </div>
-        )}
 
         {error && (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -534,7 +524,7 @@ function AdminServicesContent() {
                       </button>
 
                       <button
-                        onClick={() => handleDelete(service._id)}
+                        onClick={() => setDeleteTarget(service)}
                         className="rounded-lg bg-red-50 px-2 py-2 text-sm font-semibold text-red-600 hover:bg-red-100"
                       >
                         Delete
@@ -547,14 +537,25 @@ function AdminServicesContent() {
           )}
         </section>
       </main>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this service?"
+        description={
+          deleteTarget
+            ? `${deleteTarget.serviceName} will be permanently removed. Existing appointments will keep their original price snapshot.`
+            : undefined
+        }
+        confirmLabel="Delete service"
+        destructive
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
 
 export default function AdminServicesPage() {
-  return (
-    <RoleGuard allowedRole="admin">
-      <AdminServicesContent />
-    </RoleGuard>
-  );
+  return <AdminServicesContent />;
 }

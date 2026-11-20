@@ -1,19 +1,29 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
-import RoleGuard from "@/components/RoleGuard";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { authenticatedFetch } from "@/lib/api";
 
 interface ServiceInfo {
   serviceName?: string;
   category?: string;
+  image?: string;
 }
+
+interface CustomerInfo {
+  _id?: string;
+  name?: string;
+  email?: string;
+  image?: string;
+  phone?: string;
+}
+
+type CustomerRef = CustomerInfo | string | null;
 
 interface Appointment {
   _id: string;
-  customerId: string;
+  customerId: CustomerRef;
   serviceId: ServiceInfo | string;
   appointmentDate: string;
   timeSlot: string;
@@ -24,13 +34,20 @@ interface Appointment {
   createdAt: string;
 }
 
+type PendingAction = {
+  appointment: Appointment;
+  status: "confirmed" | "cancelled";
+};
+
 function AdminAppointmentsContent() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [filter, setFilter] = useState("all");
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    null
+  );
 
   const fetchAppointments = async () => {
     try {
@@ -46,9 +63,10 @@ function AdminAppointmentsContent() {
 
       setAppointments(result.data || []);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -58,23 +76,17 @@ function AdminAppointmentsContent() {
     fetchAppointments();
   }, []);
 
-  const updateStatus = async (
-    appointmentId: string,
-    status: "confirmed" | "cancelled"
-  ) => {
+  const updateStatus = async () => {
+    if (!pendingAction) return;
+
+    const { appointment, status } = pendingAction;
     const action = status === "confirmed" ? "confirm" : "cancel";
 
-    if (!window.confirm(`Are you sure you want to ${action} this appointment?`)) {
-      return;
-    }
-
     try {
-      setUpdatingId(appointmentId);
-      setMessage("");
-      setError("");
+      setUpdatingId(appointment._id);
 
       const response = await authenticatedFetch(
-        `/api/appointments/${appointmentId}/status`,
+        `/api/appointments/${appointment._id}/status`,
         {
           method: "PATCH",
           body: JSON.stringify({ status }),
@@ -87,10 +99,11 @@ function AdminAppointmentsContent() {
         throw new Error(result.message || "Could not update appointment.");
       }
 
-      setMessage(`Appointment ${action}ed successfully.`);
+      toast.success(`Appointment ${action}ed successfully.`);
+      setPendingAction(null);
       await fetchAppointments();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Something went wrong."
       );
     } finally {
@@ -110,11 +123,11 @@ function AdminAppointmentsContent() {
     cancelled: appointments.filter((item) => item.status === "cancelled").length,
   };
 
-  const getServiceName = (service: ServiceInfo | string) => {
-    return typeof service === "object"
-      ? service.serviceName || "Salon Service"
-      : "Salon Service";
-  };
+  const getService = (service: ServiceInfo | string): ServiceInfo =>
+    typeof service === "object" && service ? service : {};
+
+  const getCustomer = (customer: CustomerRef): CustomerInfo =>
+    typeof customer === "object" && customer ? customer : {};
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-GB", {
@@ -124,107 +137,142 @@ function AdminAppointmentsContent() {
     });
   };
 
+  const formatDateTime = (date: string) =>
+    new Date(date).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
   return (
-    <div className="min-h-screen bg-[#faf7f2] text-[#29231f]">
-      <Navbar />
+    <div>
+      <div className="mb-8">
+        <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#a17a50]">
+          Administration
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-[#684329] md:text-4xl">
+          Manage Appointments
+        </h1>
+        <p className="mt-3 text-sm text-[#766e67]">
+          Review booking requests and manage customer appointments.
+        </p>
+      </div>
 
-      <main className="mx-auto max-w-7xl px-5 py-10">
-        <div className="mb-8">
-          <p className="font-semibold uppercase tracking-widest text-[#8b5e3c]">
-            Administration
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-[#684329] md:text-4xl">
-            Manage Appointments
-          </h1>
-          <p className="mt-3 text-[#8b8178]">
-            Review bookings and manage customer appointment requests.
-          </p>
+      {error && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={fetchAppointments}
+            className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+          >
+            Try Again
+          </button>
         </div>
+      )}
 
-        {message && (
-          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            {message}
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {[
+          { label: "All Bookings", value: counts.all },
+          { label: "Pending", value: counts.pending },
+          { label: "Confirmed", value: counts.confirmed },
+          { label: "Cancelled", value: counts.cancelled },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-[#e9dfd4] bg-white p-5 shadow-sm"
+          >
+            <p className="text-sm text-[#8b8178]">{item.label}</p>
+            <p className="mt-2 text-3xl font-bold text-[#684329]">
+              {item.value}
+            </p>
           </div>
-        )}
+        ))}
+      </div>
 
-        {error && (
-          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            { label: "All Bookings", value: counts.all },
-            { label: "Pending", value: counts.pending },
-            { label: "Confirmed", value: counts.confirmed },
-            { label: "Cancelled", value: counts.cancelled },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-2xl border border-[#e9dfd4] bg-white p-5 shadow-sm"
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {["all", "pending", "confirmed", "cancelled"].map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setFilter(status)}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
+                filter === status
+                  ? "bg-[#8b5e3c] text-white"
+                  : "border border-[#e9dfd4] bg-white text-[#684329] hover:bg-[#f5eee7]"
+              }`}
             >
-              <p className="text-sm text-[#8b8178]">{item.label}</p>
-              <p className="mt-2 text-3xl font-bold text-[#684329]">
-                {item.value}
-              </p>
-            </div>
+              {status}
+            </button>
           ))}
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {["all", "pending", "confirmed", "cancelled"].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
-                  filter === status
-                    ? "bg-[#8b5e3c] text-white"
-                    : "border border-[#e9dfd4] bg-white text-[#684329] hover:bg-[#f5eee7]"
-                }`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
+        <button
+          type="button"
+          onClick={fetchAppointments}
+          className="rounded-lg border border-[#d8c8b8] px-4 py-2 text-sm font-semibold text-[#684329] hover:bg-white"
+        >
+          Refresh
+        </button>
+      </div>
 
-          <button
-            onClick={fetchAppointments}
-            className="rounded-lg border border-[#d8c8b8] px-4 py-2 text-sm font-semibold text-[#684329] hover:bg-white"
-          >
-            Refresh
-          </button>
+      {loading ? (
+        <div className="rounded-2xl border border-[#e9dfd4] bg-white p-10 text-center text-[#8b8178]">
+          Loading appointments...
         </div>
+      ) : filteredAppointments.length === 0 ? (
+        <div className="rounded-2xl border border-[#e9dfd4] bg-white p-10 text-center text-[#8b8178]">
+          No {filter === "all" ? "" : filter} appointments found.
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {filteredAppointments.map((appointment) => {
+            const service = getService(appointment.serviceId);
+            const customer = getCustomer(appointment.customerId);
 
-        {loading ? (
-          <div className="rounded-2xl bg-white p-10 text-center text-[#8b8178]">
-            Loading appointments...
-          </div>
-        ) : filteredAppointments.length === 0 ? (
-          <div className="rounded-2xl bg-white p-10 text-center text-[#8b8178]">
-            No {filter === "all" ? "" : filter} appointments found.
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {filteredAppointments.map((appointment) => (
+            return (
               <article
                 key={appointment._id}
                 className="rounded-2xl border border-[#e9dfd4] bg-white p-5 shadow-sm md:p-6"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#8b5e3c]">
-                      {getServiceName(appointment.serviceId)}
-                    </span>
+                  <div className="flex min-w-0 items-start gap-4">
+                    {service.image ? (
+                      <img
+                        src={service.image}
+                        alt={service.serviceName || "Salon service"}
+                        className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#f4ede4] text-2xl text-[#8b5e3c]">
+                        ✂
+                      </span>
+                    )}
 
-                    <h2 className="mt-2 text-lg font-bold text-[#684329]">
-                      Appointment Details
-                    </h2>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-[#8b5e3c]">
+                          {service.serviceName || "Salon Service"}
+                        </span>
+                        {service.category && (
+                          <span className="rounded-full bg-[#f4ede4] px-2.5 py-0.5 text-[10px] font-bold text-[#8b5e3c]">
+                            {service.category}
+                          </span>
+                        )}
+                      </div>
 
-                    <p className="mt-1 break-all text-xs text-[#8b8178]">
-                      ID: {appointment._id}
-                    </p>
+                      <h2 className="mt-2 text-lg font-bold text-[#684329]">
+                        {customer.name || "Unknown Customer"}
+                      </h2>
+
+                      <p className="mt-1 break-all text-xs text-[#8b8178]">
+                        {customer.email || "No email on file"}
+                        {customer.phone ? ` • ${customer.phone}` : ""}
+                      </p>
+                    </div>
                   </div>
 
                   <span
@@ -242,13 +290,6 @@ function AdminAppointmentsContent() {
 
                 <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <p className="text-[#8b8178]">Customer ID</p>
-                    <p className="mt-1 break-all font-medium">
-                      {appointment.customerId}
-                    </p>
-                  </div>
-
-                  <div>
                     <p className="text-[#8b8178]">Appointment Date</p>
                     <p className="mt-1 font-medium">
                       {formatDate(appointment.appointmentDate)}
@@ -263,7 +304,7 @@ function AdminAppointmentsContent() {
                   <div>
                     <p className="text-[#8b8178]">Service Price</p>
                     <p className="mt-1 font-medium">
-                      ৳{appointment.servicePrice}
+                      ৳{appointment.servicePrice.toLocaleString("en-BD")}
                     </p>
                   </div>
 
@@ -281,9 +322,16 @@ function AdminAppointmentsContent() {
                   </div>
 
                   <div>
-                    <p className="text-[#8b8178]">Booked On</p>
+                    <p className="text-[#8b8178]">Requested On</p>
                     <p className="mt-1 font-medium">
-                      {formatDate(appointment.createdAt)}
+                      {formatDateTime(appointment.createdAt)}
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <p className="text-[#8b8178]">Customer ID</p>
+                    <p className="mt-1 break-all text-xs font-medium text-[#6b625a]">
+                      {customer._id || String(appointment.customerId)}
                     </p>
                   </div>
                 </div>
@@ -301,10 +349,14 @@ function AdminAppointmentsContent() {
 
                 {appointment.status !== "cancelled" && (
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-[#eee5dc] pt-5">
-                    {appointment.status !== "confirmed" && (
+                    {appointment.status === "pending" && (
                       <button
+                        type="button"
                         onClick={() =>
-                          updateStatus(appointment._id, "confirmed")
+                          setPendingAction({
+                            appointment,
+                            status: "confirmed",
+                          })
                         }
                         disabled={updatingId === appointment._id}
                         className="rounded-lg bg-[#8b5e3c] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#684329] disabled:opacity-50"
@@ -316,8 +368,12 @@ function AdminAppointmentsContent() {
                     )}
 
                     <button
+                      type="button"
                       onClick={() =>
-                        updateStatus(appointment._id, "cancelled")
+                        setPendingAction({
+                          appointment,
+                          status: "cancelled",
+                        })
                       }
                       disabled={updatingId === appointment._id}
                       className="rounded-lg border border-red-200 px-5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
@@ -327,18 +383,37 @@ function AdminAppointmentsContent() {
                   </div>
                 )}
               </article>
-            ))}
-          </div>
-        )}
-      </main>
+            );
+          })}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        title={
+          pendingAction?.status === "confirmed"
+            ? "Confirm this appointment?"
+            : "Cancel this appointment?"
+        }
+        description={
+          pendingAction?.status === "confirmed"
+            ? "The customer will be able to pay for this appointment after confirmation."
+            : "The appointment will be cancelled and its time slot released."
+        }
+        confirmLabel={
+          pendingAction?.status === "confirmed"
+            ? "Yes, confirm"
+            : "Yes, cancel it"
+        }
+        destructive={pendingAction?.status === "cancelled"}
+        busy={Boolean(updatingId)}
+        onConfirm={updateStatus}
+        onCancel={() => setPendingAction(null)}
+      />
     </div>
   );
 }
 
 export default function AdminAppointmentsPage() {
-  return (
-    <RoleGuard allowedRole="admin">
-      <AdminAppointmentsContent />
-    </RoleGuard>
-  );
+  return <AdminAppointmentsContent />;
 }

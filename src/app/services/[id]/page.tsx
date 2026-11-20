@@ -41,6 +41,18 @@ function ServiceDetailsContent() {
   const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
+    if (isPending) return;
+
+    if (!session) {
+      router.replace(
+        `/auth/login?redirect=${encodeURIComponent(
+          `/services/${params.id}`
+        )}`
+      );
+    }
+  }, [session, isPending, router, params.id]);
+
+  useEffect(() => {
     const fetchService = async () => {
       try {
         setLoading(true);
@@ -107,13 +119,22 @@ function ServiceDetailsContent() {
           ← Back to Services
         </Link>
 
-        {loading && (
+        {isPending || !session ? (
           <div className="py-24 text-center">
-            <p className="text-lg text-[#684329]">
-              Loading service details...
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#e5dbcf] border-t-[#8b5e3c]" />
+            <p className="mt-4 text-sm text-[#8b5e3c]">
+              Checking your account...
             </p>
           </div>
-        )}
+        ) : (
+          <>
+            {loading && (
+              <div className="py-24 text-center">
+                <p className="text-lg text-[#684329]">
+                  Loading service details...
+                </p>
+              </div>
+            )}
 
         {!loading && error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
@@ -200,11 +221,9 @@ function ServiceDetailsContent() {
             </div>
           </div>
         )}
+          </>
+        )}
       </main>
-
-      <footer className="mt-16 border-t border-[#e9dfd4] py-6 text-center text-sm text-[#8b8178]">
-        © 2026 SalonBook. All rights reserved.
-      </footer>
     </div>
   );
 }

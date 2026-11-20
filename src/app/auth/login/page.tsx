@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const target =
+    redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
 
   const handleGoogleLogin = async () => {
     setError("");
@@ -20,7 +25,7 @@ export default function LoginPage() {
     try {
       const result = (await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: target,
       })) as { error?: { message?: string } } | undefined;
 
       if (result?.error) {
@@ -52,7 +57,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(target);
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -150,5 +155,19 @@ export default function LoginPage() {
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#f8f5f2]">
+          <p className="text-[#9b6b43]">Loading sign in...</p>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

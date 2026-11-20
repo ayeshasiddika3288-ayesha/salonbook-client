@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function PaymentSuccessPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#faf7f2] px-5">
+    <main className="flex min-h-[60vh] items-center justify-center px-5">
       <div className="w-full max-w-lg rounded-3xl border border-[#e9dfd4] bg-white p-8 text-center shadow-sm">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700">
           ✓

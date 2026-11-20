@@ -328,11 +328,6 @@ function ServicesContent() {
           </div>
         )}
       </section>
-
-      {/* Footer */}
-      <footer className="bg-[#29231f] px-5 py-8 text-center text-sm text-[#c7bbb0]">
-        © 2026 SalonBook. All rights reserved.
-      </footer>
     </main>
   );
 }

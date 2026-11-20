@@ -7,26 +7,34 @@
 - Responsive salon-themed UI (desktop, tablet, mobile)
 - Public home page with dynamic featured services and service categories
 - Browse services with search, category filter, and price sorting
-- Protected service details page with appointment booking
-- Better Auth sign up / sign in (email + password, Google)
-- Role-based protected routes:
+- Login-protected service details page with appointment booking
+- Better Auth sign up / sign in (email + password, Google OAuth when configured)
+  - Password rule: at least 6 characters with one uppercase and one lowercase letter
+  - Optional phone number saved on the profile
+- Role-based dashboard with a shared sidebar shell (`DashboardShell`):
   - Customers → `/dashboard/customer`
   - Admins → `/dashboard/admin`
+  - Wrong-role visits are redirected, signed-out visitors are sent to login with a `?redirect=` back-link
 - Customer dashboard
   - Live overview statistics
-  - My appointments (status badges, cancel pending, pay confirmed)
-  - Payment history
-  - Profile management with image upload
+  - My appointments with service image/category, requested date, booking details and price snapshot
+  - Cancel own **pending** appointments (custom confirm dialog)
+  - Pay **confirmed** unpaid appointments through Stripe Checkout
+  - Payment history with `paid` / `failed` statuses
+  - Profile management (name, phone, image upload)
 - Admin dashboard
   - Live overview statistics
   - Manage services (create, update, upload image, activate/deactivate, delete)
-  - Manage appointments (confirm pending, cancel)
+  - Manage appointments with customer name, email and phone; confirm `pending → confirmed` and cancel
   - Manage customers (view, block, unblock)
-  - Transactions
+  - Transactions with customer details and `paid` / `failed` statuses
   - Admin profile
 - Stripe Checkout redirect + payment success/cancel pages
-- Toast/inline feedback, loading states, and error handling
-- Footer with contact details, opening hours, and social links
+- `sonner` toast notifications everywhere instead of `alert` / `window.confirm`
+- Custom `ConfirmDialog` for destructive actions (cancel, delete, block)
+- Global navbar with desktop profile dropdown and mobile menu
+- Custom `not-found`, `error`, `global-error` and `loading` pages
+- Shared footer with contact details, opening hours, and social links
 
 ## Technology Stack
 
@@ -77,14 +85,31 @@ npm start
 
 - Home: `/`
 - Browse services: `/services`
-- Service details: `/services/[id]`
+- Service details (login required): `/services/[id]`
 - Booking: `/booking?service=<id>`
 - Sign in: `/auth/login`
 - Sign up: `/auth/register`
 - Customer dashboard: `/dashboard/customer`
+- Customer appointments: `/dashboard/customer/appointments`
+- Customer payments: `/dashboard/customer/payments`
+- Customer profile: `/dashboard/customer/profile`
 - Admin dashboard: `/dashboard/admin`
+- Admin services: `/dashboard/admin/services`
+- Admin appointments: `/dashboard/admin/appointments`
+- Admin customers: `/dashboard/admin/customers`
+- Admin transactions: `/dashboard/admin/transactions`
+- Admin profile: `/dashboard/admin/profile`
 - Payment success: `/dashboard/customer/payments/success`
 - Payment cancel: `/dashboard/customer/payments/cancel`
+
+## Demo Accounts
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@salonbook.com` | `AdminSalon1` |
+| Customer | `customer.test@example.com` | `Customer123` |
+
+> Change the admin password before sharing a public deployment.
 
 ## Live Website
 
@@ -98,6 +123,26 @@ npm start
 
 ## Deployment Notes
 
-- Set `NEXT_PUBLIC_API_URL` to the deployed server URL in the hosting dashboard.
-- On the server, `CLIENT_URL` must include this deployed client URL (CORS + Better Auth trusted origin).
-- Private routes use client-side session checks; make sure the server is reachable and `BETTER_AUTH_URL` is correct so refreshes keep the user signed in.
+### Vercel (client)
+
+1. Import this repository in Vercel and keep the auto-detected **Next.js** preset.
+2. Add the environment variable:
+   - `NEXT_PUBLIC_API_URL` → your deployed Express server URL (no trailing slash)
+3. Deploy, then copy the Vercel domain into the server configuration below.
+4. Re-deploy after changing any `NEXT_PUBLIC_*` variable — they are inlined at build time.
+
+### Express server
+
+Vercel serves the Next.js app only. The Express + MongoDB API must be hosted separately (Render, Railway, Fly.io, etc.):
+
+- Set `CLIENT_URL` to the Vercel domain so CORS and Better Auth trusted origins accept it (comma-separate extra origins such as a preview domain).
+- Set `BETTER_AUTH_URL` to the public server URL.
+- Set `NODE_ENV=production`, `MONGODB_URI`, `BETTER_AUTH_SECRET`, Stripe and ImgBB keys.
+- Add the Stripe webhook endpoint `https://<server-domain>/api/payments/webhook`.
+- If Google sign-in is enabled, add `https://<server-domain>/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console.
+
+### Auth notes
+
+- Dashboard routes are guarded client-side by `DashboardShell`; the API enforces roles server-side on every protected request.
+- The server re-reads `role` and `isBlocked` from MongoDB on each request, so blocking a customer invalidates their access immediately.
+
