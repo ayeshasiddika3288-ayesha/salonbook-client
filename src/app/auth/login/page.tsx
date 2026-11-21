@@ -25,7 +25,7 @@ function LoginContent() {
     try {
       const result = (await signIn.social({
         provider: "google",
-        callbackURL: target,
+        callbackURL: `${window.location.origin}${target}`,
       })) as { error?: { message?: string } } | undefined;
 
       if (result?.error) {

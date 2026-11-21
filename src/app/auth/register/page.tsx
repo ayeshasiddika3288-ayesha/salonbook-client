@@ -23,7 +23,7 @@ export default function RegisterPage() {
     try {
       const result = (await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: `${window.location.origin}/dashboard`,
       })) as { error?: { message?: string } } | undefined;
 
       if (result?.error) {
