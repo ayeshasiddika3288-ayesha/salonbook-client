@@ -113,8 +113,9 @@ npm start
 
 ## Live Website
 
-- Client: _add your deployed client URL here_
-- Server: _add your deployed server URL here_
+- Client: https://salonbook-client-six.vercel.app
+- Server: https://salonbook-server-gules.vercel.app
+- Health check: https://salonbook-server-gules.vercel.app/api/health
 
 ## Repositories
 
@@ -133,16 +134,18 @@ npm start
 
 ### Express server
 
-Vercel serves the Next.js app only. The Express + MongoDB API must be hosted separately (Render, Railway, Fly.io, etc.):
+The Express + MongoDB API is deployed on Vercel as a second project using the **Express** backend preset (`src/app.js` exports the Express app, and the database connections are cached per serverless instance):
 
-- Set `CLIENT_URL` to the Vercel domain so CORS and Better Auth trusted origins accept it (comma-separate extra origins such as a preview domain).
+- Set `CLIENT_URL` to the Vercel client domain so CORS and Better Auth trusted origins accept it (comma-separate extra origins such as preview domains; trailing slashes are trimmed automatically).
 - Set `BETTER_AUTH_URL` to the public server URL.
-- Set `NODE_ENV=production`, `MONGODB_URI`, `BETTER_AUTH_SECRET`, Stripe and ImgBB keys.
+- Set `MONGODB_URI`, `BETTER_AUTH_SECRET`, Stripe and ImgBB keys. `NODE_ENV=production` is provided by Vercel.
 - Add the Stripe webhook endpoint `https://<server-domain>/api/payments/webhook`.
 - If Google sign-in is enabled, add `https://<server-domain>/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console.
+- Render/Railway work too — the same environment variables apply, just run `npm start`.
 
 ### Auth notes
 
 - Dashboard routes are guarded client-side by `DashboardShell`; the API enforces roles server-side on every protected request.
 - The server re-reads `role` and `isBlocked` from MongoDB on each request, so blocking a customer invalidates their access immediately.
+- Because the client and API live on different `vercel.app` sub-domains, production session cookies are issued with `SameSite=None; Secure` (first-party on Chrome/Edge/Firefox).
 
