@@ -1,12 +1,12 @@
+
 "use client";
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 
 function LoginContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
 
@@ -16,17 +16,21 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
 
   const target =
-    redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+    redirectTo && redirectTo.startsWith("/")
+      ? redirectTo
+      : "/dashboard";
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
+
     setError("");
     setLoading(true);
 
     try {
-      const result = (await signIn.social({
+      const result = await signIn.social({
         provider: "google",
         callbackURL: `${window.location.origin}${target}`,
-      })) as { error?: { message?: string } } | undefined;
+      });
 
       if (result?.error) {
         setError(
@@ -35,33 +39,42 @@ function LoginContent() {
         );
         setLoading(false);
       }
-    } catch {
+    } catch (error) {
+      console.error("Google login error:", error);
       setError("Google sign-in failed. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
+
+    if (loading) return;
+
     setError("");
     setLoading(true);
 
     try {
       const result = await signIn.email({
-        email,
+        email: email.trim(),
         password,
       });
 
       if (result.error) {
-        setError(result.error.message || "Login failed. Please try again.");
+        setError(
+          result.error.message || "Login failed. Please try again."
+        );
+        setLoading(false);
         return;
       }
 
-      router.push(target);
-      router.refresh();
-    } catch {
+      // Reload destination after successful login
+      window.location.assign(target);
+    } catch (error) {
+      console.error("Login error:", error);
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -87,7 +100,9 @@ function LoginContent() {
           disabled={loading}
           className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="text-lg font-bold text-[#4285F4]">G</span>
+          <span className="text-lg font-bold text-[#4285F4]">
+            G
+          </span>
           Continue with Google
         </button>
 
@@ -99,9 +114,13 @@ function LoginContent() {
 
         <form onSubmit={handleLogin} className="mt-6 space-y-5">
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Email Address
             </label>
+
             <input
               id="email"
               type="email"
@@ -114,9 +133,13 @@ function LoginContent() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Password
             </label>
+
             <input
               id="password"
               type="password"
@@ -129,7 +152,10 @@ function LoginContent() {
           </div>
 
           {error && (
-            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+            <p
+              role="alert"
+              className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600"
+            >
               {error}
             </p>
           )}
@@ -145,12 +171,18 @@ function LoginContent() {
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="font-semibold text-[#9b6b43] hover:underline">
+          <Link
+            href="/auth/register"
+            className="font-semibold text-[#9b6b43] hover:underline"
+          >
             Create Account
           </Link>
         </p>
 
-        <Link href="/" className="mt-5 block text-center text-sm text-gray-500 hover:text-[#9b6b43]">
+        <Link
+          href="/"
+          className="mt-5 block text-center text-sm text-gray-500 hover:text-[#9b6b43]"
+        >
           ← Back to Home
         </Link>
       </div>
