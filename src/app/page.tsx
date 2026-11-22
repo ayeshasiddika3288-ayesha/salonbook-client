@@ -1,8 +1,20 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+
+import {
+  Sparkles,
+  Scissors,
+  Palette,
+  Paintbrush,
+  Flower2,
+  Droplets,
+  Leaf,
+  type LucideIcon,
+} from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -37,30 +49,59 @@ const benefits = [
   },
 ];
 
-const categoryIcons: Record<string, string> = {
-  hair: "✂️",
-  color: "🎨",
-  treatment: "🧴",
-  facial: "🧖",
-  skin: "✨",
-  makeup: "💄",
-  nail: "💅",
-  manicure: "💅",
-  pedicure: "💅",
-  spa: "🌿",
-  massage: "🌿",
+// Category icons
+const categoryIcons: Record<string, LucideIcon> = {
+  color: Palette,
+  treatment: Droplets,
+  facial: Flower2,
+  skin: Sparkles,
+  makeup: Palette,
+  nail: Paintbrush,
+  manicure: Paintbrush,
+  pedicure: Paintbrush,
+  spa: Flower2,
+  massage: Leaf,
 };
 
-const iconFor = (categoryName: string) => {
-  const normalized = categoryName.toLowerCase();
+// Find the correct icon based on category name
+const iconFor = (categoryName: string): LucideIcon => {
+  const normalized = categoryName
+    .toLowerCase()
+    .trim()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ");
 
-  for (const [keyword, icon] of Object.entries(categoryIcons)) {
+  // Hair Cut
+  if (
+    normalized === "hair cut" ||
+    normalized === "haircut" ||
+    normalized.includes("hair cutting")
+  ) {
+    return Scissors;
+  }
+
+  // Hair Care
+  if (
+    normalized === "hair care" ||
+    normalized === "haircare" ||
+    normalized.includes("hair treatment")
+  ) {
+    return Droplets;
+  }
+
+  // General Hair
+  if (normalized === "hair") {
+  return Scissors;
+}
+
+  // Other categories
+  for (const [keyword, Icon] of Object.entries(categoryIcons)) {
     if (normalized.includes(keyword)) {
-      return icon;
+      return Icon;
     }
   }
 
-  return "💫";
+  return Sparkles;
 };
 
 const formatPrice = (price: number) =>
@@ -72,6 +113,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Fetch services from backend API
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -107,16 +149,19 @@ export default function HomePage() {
     fetchServices();
   }, [reloadKey]);
 
+  // Get first six featured services
   const featuredServices = useMemo(
     () => services.slice(0, 6),
     [services]
   );
 
+  // Generate categories and count their services
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
 
     services.forEach((service) => {
       if (!service.category) return;
+
       counts.set(
         service.category,
         (counts.get(service.category) || 0) + 1
@@ -133,7 +178,7 @@ export default function HomePage() {
     <main className="flex-1">
       <Navbar />
 
-      {/* Hero */}
+      {/* Hero Section */}
       <section className="relative overflow-hidden bg-[#eee5da]">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-16 md:grid-cols-2 md:py-24 lg:px-8">
           <div className="relative z-10">
@@ -160,6 +205,7 @@ export default function HomePage() {
               >
                 Explore Salon Services →
               </Link>
+
               <a
                 href="#about"
                 className="rounded-full border border-[#bda991] px-7 py-3.5 text-sm font-semibold text-[#684329] transition hover:bg-white/60"
@@ -171,23 +217,34 @@ export default function HomePage() {
             <div className="mt-12 flex flex-wrap gap-8 border-t border-[#d9cabb] pt-7">
               <div>
                 <p className="text-2xl font-bold text-[#684329]">Easy</p>
-                <p className="mt-1 text-xs text-[#766e67]">Online Booking</p>
+                <p className="mt-1 text-xs text-[#766e67]">
+                  Online Booking
+                </p>
               </div>
+
               <div>
-                <p className="text-2xl font-bold text-[#684329]">Flexible</p>
+                <p className="text-2xl font-bold text-[#684329]">
+                  Flexible
+                </p>
                 <p className="mt-1 text-xs text-[#766e67]">
                   Appointment Slots
                 </p>
               </div>
+
               <div>
-                <p className="text-2xl font-bold text-[#684329]">Secure</p>
-                <p className="mt-1 text-xs text-[#766e67]">Online Payment</p>
+                <p className="text-2xl font-bold text-[#684329]">
+                  Secure
+                </p>
+                <p className="mt-1 text-xs text-[#766e67]">
+                  Online Payment
+                </p>
               </div>
             </div>
           </div>
 
           <div className="relative mx-auto w-full max-w-lg">
             <div className="absolute -right-5 -top-5 h-40 w-40 rounded-full bg-[#c6a36b]/30 blur-2xl" />
+
             <div className="relative overflow-hidden rounded-[45%_45%_12px_12px] border-[10px] border-white/70 shadow-2xl">
               <img
                 src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1000&q=90"
@@ -195,10 +252,12 @@ export default function HomePage() {
                 className="h-[430px] w-full object-cover sm:h-[520px]"
               />
             </div>
+
             <div className="absolute -bottom-5 -left-4 rounded-2xl bg-white p-5 shadow-xl sm:-left-8">
               <p className="text-xs font-medium uppercase tracking-wider text-[#8b5e3c]">
                 Make time for you
               </p>
+
               <p className="mt-1 font-serif text-xl text-[#29231f]">
                 Feel beautiful. Feel confident.
               </p>
@@ -207,16 +266,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Services */}
+      {/* Featured Services Section */}
       <section className="bg-[#f1ebe3] py-20">
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
           <div className="mb-10 text-center">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#a17a50]">
               A Little Something for You
             </p>
+
             <h2 className="mt-3 text-3xl font-semibold text-[#29231f] sm:text-4xl">
               Featured Salon Services
             </h2>
+
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#766e67]">
               Discover some of the services available at SalonBook and find
               the perfect treatment for your next visit.
@@ -226,6 +287,7 @@ export default function HomePage() {
           {loading && (
             <div className="py-16 text-center">
               <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#e5dbcf] border-t-[#8b5e3c]" />
+
               <p className="mt-4 text-sm text-[#766e67]">
                 Loading featured services...
               </p>
@@ -237,7 +299,9 @@ export default function HomePage() {
               <h3 className="text-xl font-semibold text-red-700">
                 Unable to load services
               </h3>
+
               <p className="mt-2 text-sm text-red-600">{error}</p>
+
               <button
                 type="button"
                 onClick={() => setReloadKey((key) => key + 1)}
@@ -253,6 +317,7 @@ export default function HomePage() {
               <p className="text-lg font-semibold text-[#29231f]">
                 No services available yet
               </p>
+
               <p className="mt-2 text-sm text-[#766e67]">
                 Please check back soon for new salon services.
               </p>
@@ -274,24 +339,30 @@ export default function HomePage() {
                         className="h-60 w-full object-cover transition duration-500 group-hover:scale-105"
                       />
                     </div>
+
                     <div className="flex flex-1 flex-col p-6">
                       <p className="text-xs font-bold uppercase tracking-wider text-[#a17a50]">
                         {service.category}
                       </p>
+
                       <h3 className="mt-2 text-xl font-semibold text-[#29231f]">
                         {service.serviceName}
                       </h3>
+
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#766e67]">
                         {service.description}
                       </p>
+
                       <div className="mt-4 flex items-center justify-between border-t border-[#eee5da] pt-4">
                         <span className="text-sm text-[#766e67]">
                           {service.duration} minutes
                         </span>
+
                         <span className="text-lg font-bold text-[#8b5e3c]">
                           {formatPrice(service.price)}
                         </span>
                       </div>
+
                       <Link
                         href={`/services/${service._id}`}
                         className="mt-5 block rounded-full border border-[#8b5e3c] py-3 text-center text-sm font-semibold text-[#8b5e3c] transition hover:bg-[#8b5e3c] hover:text-white"
@@ -316,17 +387,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Categories */}
+      {/* Browse by Category Section */}
       <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8">
         <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#a17a50]">
               Explore Our World
             </p>
+
             <h2 className="mt-3 text-3xl font-semibold text-[#29231f] sm:text-4xl">
               Browse by Category
             </h2>
           </div>
+
           <Link
             href="/services"
             className="text-sm font-semibold text-[#8b5e3c] hover:text-[#684329]"
@@ -341,48 +414,62 @@ export default function HomePage() {
           </p>
         )}
 
-        {categories.length > 0 && (
+        {!loading && !error && categories.length > 0 && (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {categories.slice(0, 8).map((category) => (
-              <Link
-                key={category.name}
-                href={`/services?category=${encodeURIComponent(category.name)}`}
-                className="group rounded-2xl border border-[#eee5da] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-[#c6a36b] hover:shadow-xl hover:shadow-[#684329]/5"
-              >
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f4ede4] text-3xl transition group-hover:bg-[#eee0ce]">
-                  {iconFor(category.name)}
-                </span>
-                <h3 className="mt-6 text-lg font-semibold text-[#29231f]">
-                  {category.name}
-                </h3>
-                <p className="mt-2 text-sm text-[#766e67]">
-                  {category.count}{" "}
-                  {category.count === 1 ? "service" : "services"} available
-                </p>
-                <p className="mt-5 text-sm font-semibold text-[#8b5e3c]">
-                  Explore →
-                </p>
-              </Link>
-            ))}
+            {categories.slice(0, 8).map((category) => {
+              const CategoryIcon = iconFor(category.name);
+
+              return (
+                <Link
+                  key={category.name}
+                  href={`/services?category=${encodeURIComponent(category.name)}`}
+                  className="group rounded-2xl border border-[#eee5da] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-[#c6a36b] hover:shadow-xl hover:shadow-[#684329]/5"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f4ede4] transition group-hover:bg-[#eee0ce]">
+                    <CategoryIcon
+                      className="h-7 w-7 text-[#9b6b43]"
+                      strokeWidth={1.8}
+                      aria-hidden="true"
+                    />
+                  </span>
+
+                  <h3 className="mt-6 text-lg font-semibold text-[#29231f]">
+                    {category.name}
+                  </h3>
+
+                  <p className="mt-2 text-sm text-[#766e67]">
+                    {category.count}{" "}
+                    {category.count === 1 ? "service" : "services"} available
+                  </p>
+
+                  <p className="mt-5 text-sm font-semibold text-[#8b5e3c]">
+                    Explore →
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* About / Benefits */}
+      {/* About / Benefits Section */}
       <section id="about" className="mx-auto max-w-7xl px-5 pb-20 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#a17a50]">
               Why SalonBook
             </p>
+
             <h2 className="mt-3 max-w-lg text-3xl font-semibold leading-tight text-[#29231f] sm:text-4xl">
               Your salon experience, made simple.
             </h2>
+
             <p className="mt-5 max-w-lg text-sm leading-8 text-[#766e67]">
               We make it easier to discover salon services and manage your
               appointments. Spend less time planning and more time enjoying
               your self-care moments.
             </p>
+
             <Link
               href="/services"
               className="mt-8 inline-block rounded-full bg-[#8b5e3c] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[#684329]"
@@ -397,10 +484,12 @@ export default function HomePage() {
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#eee5da] font-semibold text-[#8b5e3c]">
                   {benefit.number}
                 </span>
+
                 <div>
                   <h3 className="text-lg font-semibold text-[#29231f]">
                     {benefit.title}
                   </h3>
+
                   <p className="mt-2 text-sm leading-7 text-[#766e67]">
                     {benefit.description}
                   </p>
@@ -411,19 +500,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Booking CTA */}
+      {/* Booking CTA Section */}
       <section className="px-5 pb-20 lg:px-8">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-3xl bg-[#684329] px-7 py-14 text-center sm:px-12">
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#e6c99f]">
             Your Next Self-Care Moment
           </p>
+
           <h2 className="mx-auto mt-4 max-w-2xl font-serif text-3xl leading-tight text-white sm:text-5xl">
             Ready to feel your best?
           </h2>
+
           <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#eadfd3]">
             Find a service you love and book your appointment in just a few
             simple steps.
           </p>
+
           <Link
             href="/services"
             className="mt-8 inline-block rounded-full bg-[#e6c99f] px-8 py-3.5 text-sm font-bold text-[#50341f] transition hover:bg-white"
