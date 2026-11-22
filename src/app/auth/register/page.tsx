@@ -2,29 +2,60 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn, signUp } from "@/lib/auth-client";
 
-export default function RegisterPage() {
-  const router = useRouter();
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+];
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Could not read the selected image."));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Could not read the selected image."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+
+export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [image, setImage] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
+
     setError("");
     setLoading(true);
 
     try {
-      const result = (await signIn.social({
+      const result = await signIn.social({
         provider: "google",
         callbackURL: `${window.location.origin}/dashboard`,
-      })) as { error?: { message?: string } } | undefined;
+      });
 
       if (result?.error) {
         setError(
@@ -39,8 +70,13 @@ export default function RegisterPage() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegister = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
+
+    if (loading) return;
+
     setError("");
 
     if (password.length < 6) {
@@ -63,25 +99,80 @@ export default function RegisterPage() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const result = await signUp.email({
-        name,
-        email,
-        password,
-        ...(image.trim() ? { image: image.trim() } : {}),
-      });
-
-      if (result.error) {
-        setError(result.error.message || "Registration failed. Please try again.");
+    if (image) {
+      if (!ALLOWED_IMAGE_TYPES.includes(image.type)) {
+        setError("Please select a PNG, JPG, WEBP or GIF image.");
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
-    } catch {
-      setError("Something went wrong. Please try again.");
+      if (image.size > MAX_IMAGE_SIZE) {
+        setError("Image size must be 5 MB or less.");
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      let imageUrl: string | undefined;
+
+      // Upload selected image before creating the account.
+      if (image) {
+        if (!API_URL) {
+          throw new Error("Server URL is not configured.");
+        }
+
+        const imageData = await fileToBase64(image);
+
+        const uploadResponse = await fetch(
+          `${API_URL}/api/uploads/register`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              image: imageData,
+            }),
+          }
+        );
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadResult.success) {
+          throw new Error(
+            uploadResult.message || "Image upload failed."
+          );
+        }
+
+        imageUrl = uploadResult.data.url;
+      }
+
+      // Create the account using the uploaded image URL.
+      const result = await signUp.email({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        ...(imageUrl ? { image: imageUrl } : {}),
+      });
+
+      if (result.error) {
+        setError(
+          result.error.message || "Registration failed. Please try again."
+        );
+        return;
+      }
+
+      // Redirect to Sign In with a success message.
+      window.location.assign("/auth/login?registered=1");
+    } catch (error) {
+      console.error("Registration error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -120,9 +211,13 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="mt-6 space-y-5">
           <div>
-            <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Full Name
             </label>
+
             <input
               id="name"
               type="text"
@@ -135,23 +230,44 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="image" className="mb-2 block text-sm font-medium text-gray-700">
-              Profile Image URL <span className="text-gray-400">(optional)</span>
+            <label
+              htmlFor="image"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
+              Profile Image{" "}
+              <span className="text-gray-400">(optional)</span>
             </label>
+
             <input
               id="image"
-              type="url"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              placeholder="https://example.com/your-photo.jpg"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-[#9b6b43] focus:ring-2 focus:ring-[#9b6b43]/20"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => {
+                setImage(e.target.files?.[0] || null);
+                setError("");
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-[#f8f5f2] file:px-3 file:py-2 file:font-medium file:text-[#9b6b43] hover:file:bg-[#f0e8e0]"
             />
+
+            <p className="mt-1 text-xs text-gray-400">
+              PNG, JPG, WEBP or GIF. Maximum 5 MB.
+            </p>
+
+            {image && (
+              <p className="mt-2 break-all text-xs text-gray-600">
+                Selected: {image.name}
+              </p>
+            )}
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Email Address
             </label>
+
             <input
               id="email"
               type="email"
@@ -164,9 +280,13 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Password
             </label>
+
             <input
               id="password"
               type="password"
@@ -180,9 +300,13 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="confirmPassword"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Confirm Password
             </label>
+
             <input
               id="confirmPassword"
               type="password"
@@ -196,7 +320,10 @@ export default function RegisterPage() {
           </div>
 
           {error && (
-            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+            <p
+              role="alert"
+              className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600"
+            >
               {error}
             </p>
           )}
@@ -212,12 +339,18 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <Link href="/auth/login" className="font-semibold text-[#9b6b43] hover:underline">
+          <Link
+            href="/auth/login"
+            className="font-semibold text-[#9b6b43] hover:underline"
+          >
             Sign In
           </Link>
         </p>
 
-        <Link href="/" className="mt-5 block text-center text-sm text-gray-500 hover:text-[#9b6b43]">
+        <Link
+          href="/"
+          className="mt-5 block text-center text-sm text-gray-500 hover:text-[#9b6b43]"
+        >
           ← Back to Home
         </Link>
       </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Suspense, useState } from "react";
@@ -8,7 +7,9 @@ import { signIn } from "@/lib/auth-client";
 
 function LoginContent() {
   const searchParams = useSearchParams();
+
   const redirectTo = searchParams.get("redirect");
+  const registered = searchParams.get("registered") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,7 +71,6 @@ function LoginContent() {
         return;
       }
 
-      // Reload destination after successful login
       window.location.assign(target);
     } catch (error) {
       console.error("Login error:", error);
@@ -94,15 +94,22 @@ function LoginContent() {
           Sign in to manage your salon appointments.
         </p>
 
+        {registered && (
+          <p
+            role="status"
+            className="mt-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+          >
+            Account created successfully! Please sign in.
+          </p>
+        )}
+
         <button
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
           className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="text-lg font-bold text-[#4285F4]">
-            G
-          </span>
+          <span className="text-lg font-bold text-[#4285F4]">G</span>
           Continue with Google
         </button>
 
