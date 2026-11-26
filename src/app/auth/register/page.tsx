@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signIn, signUp } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { authClient, signIn, signUp } from "@/lib/auth";
+import type { UserWithRole } from "@/lib/auth";
+import {
+  getRoleHome,
+  isBlockedUser,
+  resolveSocialRedirect,
+  toClientCallbackURL,
+} from "@/lib/auth-routing";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -35,12 +44,24 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+const isValidImageUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,18 +75,30 @@ export default function RegisterPage() {
     try {
       const result = await signIn.social({
         provider: "google",
-        callbackURL: `${window.location.origin}/dashboard`,
+        callbackURL: toClientCallbackURL(
+          resolveSocialRedirect(
+            typeof window === "undefined"
+              ? null
+              : new URLSearchParams(window.location.search).get("redirect")
+          )
+        ),
+        errorCallbackURL: toClientCallbackURL("/auth/login"),
       });
 
       if (result?.error) {
-        setError(
+        const message =
           result.error.message ||
-            "Google sign-up is not available right now."
-        );
+          "Google sign-up is not available right now.";
+
+        setError(message);
+        toast.error(message);
         setLoading(false);
       }
     } catch {
-      setError("Google sign-up failed. Please try again.");
+      const message = "Google sign-up failed. Please try again.";
+
+      setError(message);
+      toast.error(message);
       setLoading(false);
     }
   };
@@ -80,43 +113,70 @@ export default function RegisterPage() {
     setError("");
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+      const message = "Password must be at least 6 characters long.";
+
+      setError(message);
+      toast.error(message);
       return;
     }
 
     if (!/[A-Z]/.test(password)) {
-      setError("Password must contain at least one uppercase letter.");
+      const message = "Password must contain at least one uppercase letter.";
+
+      setError(message);
+      toast.error(message);
       return;
     }
 
     if (!/[a-z]/.test(password)) {
-      setError("Password must contain at least one lowercase letter.");
+      const message = "Password must contain at least one lowercase letter.";
+
+      setError(message);
+      toast.error(message);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      const message = "Passwords do not match.";
+
+      setError(message);
+      toast.error(message);
       return;
     }
 
     if (image) {
       if (!ALLOWED_IMAGE_TYPES.includes(image.type)) {
-        setError("Please select a PNG, JPG, WEBP or GIF image.");
+        const message = "Please select a PNG, JPG, WEBP or GIF image.";
+
+        setError(message);
+        toast.error(message);
         return;
       }
 
       if (image.size > MAX_IMAGE_SIZE) {
-        setError("Image size must be 5 MB or less.");
+        const message = "Image size must be 5 MB or less.";
+
+        setError(message);
+        toast.error(message);
         return;
       }
+    }
+
+    if (!image && imageUrl.trim() && !isValidImageUrl(imageUrl.trim())) {
+      const message = "Please enter a valid image URL starting with http or https.";
+
+      setError(message);
+      toast.error(message);
+      return;
     }
 
     setLoading(true);
 
     try {
-      let imageUrl: string | undefined;
+      let profileImageUrl = imageUrl.trim() || undefined;
 
-      // Upload selected image before creating the account.
+      // Upload selected image before creating the account. A chosen file takes
+      // priority over a pasted URL.
       if (image) {
         if (!API_URL) {
           throw new Error("Server URL is not configured.");
@@ -145,34 +205,60 @@ export default function RegisterPage() {
           );
         }
 
-        imageUrl = uploadResult.data.url;
+        profileImageUrl = uploadResult.data.url;
       }
 
-      // Create the account using the uploaded image URL.
+      // Public signup can only create a customer; role is controlled by the
+      // server's additional-field configuration.
       const result = await signUp.email({
         name: name.trim(),
         email: email.trim(),
         password,
-        ...(imageUrl ? { image: imageUrl } : {}),
+        ...(profileImageUrl ? { image: profileImageUrl } : {}),
       });
 
       if (result.error) {
-        setError(
-          result.error.message || "Registration failed. Please try again."
-        );
+        const message =
+          result.error.message || "Registration failed. Please try again.";
+
+        setError(message);
+        toast.error(message);
         return;
       }
 
-      // Redirect to Sign In with a success message.
-      window.location.assign("/auth/login?registered=1");
+      const session = await authClient.getSession();
+      const user = (session.data?.user ||
+        result.data?.user) as UserWithRole | undefined;
+
+      if (isBlockedUser(user)) {
+        const message =
+          "Your account has been blocked. Please contact support.";
+
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      toast.success("Account created successfully.");
+
+      if (session.data?.user) {
+        // Better Auth signs the user in automatically, so go straight to the
+        // correct dashboard. Fall back to sign-in if no session was created.
+        router.replace(getRoleHome(user?.role));
+        router.refresh();
+      } else {
+        router.push("/auth/login?registered=1");
+      }
     } catch (error) {
       console.error("Registration error:", error);
 
-      setError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Something went wrong. Please try again."
-      );
+          : "Something went wrong. Please try again.";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -258,6 +344,31 @@ export default function RegisterPage() {
                 Selected: {image.name}
               </p>
             )}
+
+            <div className="mt-4">
+              <label
+                htmlFor="imageUrl"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Or use an image URL
+              </label>
+
+              <input
+                id="imageUrl"
+                type="url"
+                value={imageUrl}
+                onChange={(e) => {
+                  setImageUrl(e.target.value);
+                  setError("");
+                }}
+                placeholder="https://example.com/avatar.jpg"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-[#9b6b43] focus:ring-2 focus:ring-[#9b6b43]/20"
+              />
+
+              <p className="mt-1 text-xs text-gray-400">
+                A selected file takes priority over this URL.
+              </p>
+            </div>
           </div>
 
           <div>

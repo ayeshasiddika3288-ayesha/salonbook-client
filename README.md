@@ -77,7 +77,8 @@ npm start
 
 | Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | Base URL of the SalonBook server API |
+| `NEXT_PUBLIC_API_URL` | Base URL of the SalonBook server API (also the `/api/auth/*` rewrite target) |
+| `NEXT_PUBLIC_CLIENT_URL` | Client origin used by the auth client (falls back to same-origin `/api/auth`) |
 
 > All sensitive keys (MongoDB, Better Auth secret, Stripe, ImgBB) live only on the server. Never commit `.env.local` or secret values.
 
@@ -127,8 +128,9 @@ npm start
 ### Vercel (client)
 
 1. Import this repository in Vercel and keep the auto-detected **Next.js** preset.
-2. Add the environment variable:
-   - `NEXT_PUBLIC_API_URL` → your deployed Express server URL (no trailing slash)
+2. Add the environment variables:
+   - `NEXT_PUBLIC_API_URL` → your deployed Express server URL (no trailing slash). It is also the target of the `/api/auth/*` rewrite, which keeps auth on the client domain.
+   - `NEXT_PUBLIC_CLIENT_URL` → your deployed client URL (no trailing slash), used by the auth client.
 3. Deploy, then copy the Vercel domain into the server configuration below.
 4. Re-deploy after changing any `NEXT_PUBLIC_*` variable — they are inlined at build time.
 
@@ -136,16 +138,15 @@ npm start
 
 The Express + MongoDB API is deployed on Vercel as a second project using the **Express** backend preset (`src/app.js` exports the Express app, and the database connections are cached per serverless instance):
 
-- Set `CLIENT_URL` to the Vercel client domain so CORS and Better Auth trusted origins accept it (comma-separate extra origins such as preview domains; trailing slashes are trimmed automatically).
-- Set `BETTER_AUTH_URL` to the public server URL.
+- Set `CLIENT_URL` to the Vercel client domain so CORS and Better Auth trusted origins accept it (comma-separate extra origins such as preview domains; trailing slashes are trimmed automatically). The first origin is the Better Auth base URL.
 - Set `MONGODB_URI`, `BETTER_AUTH_SECRET`, Stripe and ImgBB keys. `NODE_ENV=production` is provided by Vercel.
 - Add the Stripe webhook endpoint `https://<server-domain>/api/payments/webhook`.
-- If Google sign-in is enabled, add `https://<server-domain>/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console.
+- If Google sign-in is enabled, add `https://<client-domain>/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console.
 - Render/Railway work too — the same environment variables apply, just run `npm start`.
 
 ### Auth notes
 
 - Dashboard routes are guarded client-side by `DashboardShell`; the API enforces roles server-side on every protected request.
 - The server re-reads `role` and `isBlocked` from MongoDB on each request, so blocking a customer invalidates their access immediately.
-- Because the client and API live on different `vercel.app` sub-domains, production session cookies are issued with `SameSite=None; Secure` (first-party on Chrome/Edge/Firefox).
+- `/api/auth/*` is rewritten to the Express API, so auth callbacks and session cookies use the client domain. Production cookies are first-party (`SameSite=Lax; Secure`).
 

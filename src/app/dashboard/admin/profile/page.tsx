@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth";
 import { authenticatedFetch } from "@/lib/api";
 
 interface ProfileUser {
+  id?: string | null;
   name?: string | null;
   email?: string | null;
   image?: string | null;
   phone?: string | null;
+}
+
+interface ProfileFormProps {
+  initialName: string;
+  initialPhone: string;
+  initialImage: string;
+  email: string;
 }
 
 const readFileAsDataUrl = (file: File) =>
@@ -20,24 +28,18 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-function AdminProfileContent() {
-  const { data: session, isPending } = useSession();
-  const user = session?.user as ProfileUser | undefined;
-
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [image, setImage] = useState("");
+function AdminProfileForm({
+  initialName,
+  initialPhone,
+  initialImage,
+  email,
+}: ProfileFormProps) {
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
+  const [image, setImage] = useState(initialImage);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (session?.user) {
-      setName(user?.name || "");
-      setPhone(user?.phone || "");
-      setImage(user?.image || "");
-    }
-  }, [session?.user, user?.name, user?.phone, user?.image]);
 
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -101,14 +103,6 @@ function AdminProfileContent() {
       setLoading(false);
     }
   };
-
-  if (isPending || !session) {
-    return (
-      <div className="rounded-2xl bg-white p-10 text-center">
-        Loading profile...
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -174,7 +168,7 @@ function AdminProfileContent() {
             <input
               id="email"
               type="email"
-              value={user?.email || ""}
+              value={email}
               readOnly
               className="w-full rounded-lg border border-[#e9dfd4] bg-gray-50 px-4 py-3 text-gray-500"
             />
@@ -214,6 +208,29 @@ function AdminProfileContent() {
         </form>
       </div>
     </div>
+  );
+}
+
+function AdminProfileContent() {
+  const { data: session, isPending } = useSession();
+  const user = session?.user as ProfileUser | undefined;
+
+  if (isPending || !session || !user) {
+    return (
+      <div className="rounded-2xl bg-white p-10 text-center">
+        Loading profile...
+      </div>
+    );
+  }
+
+  return (
+    <AdminProfileForm
+      key={user.id || user.email || "profile"}
+      initialName={user.name || ""}
+      initialPhone={user.phone || ""}
+      initialImage={user.image || ""}
+      email={user.email || ""}
+    />
   );
 }
 

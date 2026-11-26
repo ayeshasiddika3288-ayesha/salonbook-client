@@ -6,9 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
-import { useSession, authClient } from "@/lib/auth-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { signOut, useSession } from "@/lib/auth";
+import { authenticatedFetch } from "@/lib/api";
+import { isBlockedUser } from "@/lib/auth-routing";
 
 const timeSlots = [
   "09:00 AM",
@@ -29,7 +29,10 @@ function BookingContent() {
   const serviceId = searchParams.get("service");
 
   const { data: session, isPending } = useSession();
-  const user = session?.user as { role?: string } | undefined;
+  const user = session?.user as
+    | { role?: string; isBlocked?: boolean }
+    | undefined;
+  const isBlocked = isBlockedUser(user);
 
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
@@ -42,18 +45,26 @@ function BookingContent() {
     if (isPending) return;
 
     if (!session) {
+      const next = serviceId
+        ? `/booking?service=${serviceId}`
+        : "/booking";
+
       router.replace(
-        serviceId
-          ? `/auth/login?service=${serviceId}`
-          : "/auth/login"
+        `/auth/login?redirect=${encodeURIComponent(next)}`
       );
       return;
     }
 
-    if (user?.role !== "customer") {
+    if (isBlocked) {
+      void signOut();
+      router.replace("/auth/login");
+      return;
+    }
+
+    if (user?.role === "admin") {
       router.replace("/dashboard/admin");
     }
-  }, [session, isPending, user?.role, router, serviceId]);
+  }, [session, isPending, isBlocked, user?.role, router, serviceId]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,19 +93,8 @@ function BookingContent() {
     try {
       setLoading(true);
 
-      const tokenResponse = await authClient.token();
-      const token = tokenResponse.data?.token;
-
-      if (!token) {
-        throw new Error("Authentication token not found. Please log in again.");
-      }
-
-      const response = await fetch(`${API_URL}/api/appointments`, {
+      const response = await authenticatedFetch("/api/appointments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           serviceId,
           appointmentDate: date,
@@ -129,7 +129,7 @@ function BookingContent() {
     }
   };
 
-  if (isPending || !session || user?.role !== "customer") {
+  if (isPending || !session || isBlocked || user?.role !== "customer") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#faf7f2]">
         <p className="text-[#684329]">Checking account access...</p>

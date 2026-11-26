@@ -4,9 +4,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { authenticatedFetch } from "@/lib/api";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { authenticatedFetch, authenticatedFetchJson } from "@/lib/api";
 
 interface Service {
   _id: string;
@@ -59,35 +57,45 @@ function AdminServicesContent() {
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchServices = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadServices = () =>
+    authenticatedFetchJson<{ data?: Service[] }>(
+      "/api/services/admin/all"
+    ).then((result) => result.data || []);
 
-      const response = await authenticatedFetch(
-        "/api/services/admin/all"
-      );
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load services.";
 
-      const result = await response.json();
+    setError(message);
+    toast.error(message);
+  };
 
-      if (!response.ok) {
-        throw new Error(result.message || "Could not load services.");
-      }
+  const refreshServices = async () => {
+    const data = await loadServices();
 
-      setServices(result.data || []);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
+    setError("");
+    setServices(data);
   };
 
   useEffect(() => {
-    fetchServices();
+    loadServices()
+      .then((data) => {
+        setError("");
+        setServices(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadServices()
+      .then((data) => setServices(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -179,7 +187,7 @@ function AdminServicesContent() {
       );
 
       resetForm();
-      await fetchServices();
+      await refreshServices();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong."
@@ -229,7 +237,7 @@ function AdminServicesContent() {
 
       toast.success("Service deleted successfully.");
       setDeleteTarget(null);
-      await fetchServices();
+      await refreshServices();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong."
@@ -261,7 +269,7 @@ function AdminServicesContent() {
       }
 
       toast.success(`Service is now ${newStatus}.`);
-      await fetchServices();
+      await refreshServices();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong."
@@ -344,7 +352,8 @@ function AdminServicesContent() {
                 <input
                   name="price"
                   type="number"
-                  min="0"
+                  min="0.01"
+                  step="0.01"
                   value={form.price}
                   onChange={handleChange}
                   required
@@ -450,7 +459,7 @@ function AdminServicesContent() {
             </h2>
 
             <button
-              onClick={fetchServices}
+              onClick={handleRetry}
               className="rounded-lg border border-[#d8c8b8] px-4 py-2 text-sm font-semibold text-[#684329] hover:bg-white"
             >
               Refresh

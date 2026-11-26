@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authenticatedFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { authenticatedFetchJson } from "@/lib/api";
 
 interface DashboardStats {
   totalCustomers: number;
@@ -56,33 +57,38 @@ function AdminDashboardContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchStats = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadStats = () =>
+    authenticatedFetchJson<{ data: DashboardStats }>("/api/admin/stats").then(
+      (result) => result.data
+    );
 
-      const response = await authenticatedFetch("/api/admin/stats");
-      const result = await response.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load dashboard data.";
 
-      if (!response.ok) {
-        throw new Error(
-          result.message || "Could not load dashboard statistics."
-        );
-      }
-
-      setStats(result.data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setError(message);
+    toast.error(message);
+  };
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    loadStats()
+      .then((data) => {
+        setError("");
+        setStats(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadStats()
+      .then((data) => setStats(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const statCards = [
     {
@@ -140,7 +146,7 @@ function AdminDashboardContent() {
             <span>{error}</span>
             <button
               type="button"
-              onClick={fetchStats}
+              onClick={handleRetry}
               className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
             >
               Try Again

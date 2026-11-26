@@ -4,6 +4,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -21,11 +22,7 @@ interface Service {
 
 const categories = ["All Categories"];
 
-function ServicesContent() {
-  const searchParams = useSearchParams();
-  const categoryParam =
-    searchParams.get("category") || "All Categories";
-
+function ServicesContent({ categoryParam }: { categoryParam: string }) {
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(categoryParam);
@@ -33,41 +30,41 @@ function ServicesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const loadServices = () => {
+    if (!API_URL) {
+      return Promise.reject(new Error("API URL is not configured."));
+    }
 
-        if (!API_URL) {
-          throw new Error("API URL is not configured.");
-        }
+    return fetch(`${API_URL}/api/services`).then(async (response) => {
+      const result = await response.json();
 
-        const response = await fetch(`${API_URL}/api/services`);
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load services.");
-        }
-
-        setServices(result.data || []);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong while loading services."
-        );
-      } finally {
-        setLoading(false);
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load services.");
       }
-    };
 
-    fetchServices();
-  }, []);
+      return (result.data || []) as Service[];
+    });
+  };
+
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Something went wrong while loading services.";
+
+    setError(message);
+    toast.error(message);
+  };
 
   useEffect(() => {
-    setCategory(categoryParam);
-  }, [categoryParam]);
+    loadServices()
+      .then((data) => {
+        setError("");
+        setServices(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
+  }, []);
 
   const availableCategories = useMemo(() => {
     const dynamicCategories = Array.from(
@@ -332,6 +329,14 @@ function ServicesContent() {
   );
 }
 
+function ServicesRoute() {
+  const searchParams = useSearchParams();
+  const categoryParam =
+    searchParams.get("category") || "All Categories";
+
+  return <ServicesContent key={categoryParam} categoryParam={categoryParam} />;
+}
+
 export default function ServicesPage() {
   return (
     <Suspense
@@ -343,7 +348,7 @@ export default function ServicesPage() {
         </div>
       }
     >
-      <ServicesContent />
+      <ServicesRoute />
     </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetchJson } from "@/lib/api";
 
 interface CustomerInfo {
   _id?: string;
@@ -24,11 +24,20 @@ interface Transaction {
   amount: number;
   currency: string;
   status: string;
+  stripeSessionId?: string | null;
   createdAt: string;
 }
 
 const normalizeStatus = (status: string) =>
   status === "paid" || status === "completed" ? "paid" : "failed";
+
+const shortReference = (value?: string | null) => {
+  if (!value) return "—";
+
+  return value.length > 18
+    ? `${value.slice(0, 12)}…${value.slice(-6)}`
+    : value;
+};
 
 function TransactionsContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -36,32 +45,38 @@ function TransactionsContent() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
 
-  const fetchTransactions = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadTransactions = () =>
+    authenticatedFetchJson<{ data?: Transaction[] }>(
+      "/api/payments/transactions"
+    ).then((result) => result.data || []);
 
-      const response = await authenticatedFetch("/api/payments/transactions");
-      const result = await response.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load transactions.";
 
-      if (!response.ok) {
-        throw new Error(result.message || "Could not load transactions.");
-      }
-
-      setTransactions(result.data || []);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
+    setError(message);
+    toast.error(message);
   };
 
   useEffect(() => {
-    fetchTransactions();
+    loadTransactions()
+      .then((data) => {
+        setError("");
+        setTransactions(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadTransactions()
+      .then((data) => setTransactions(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const filtered =
     filter === "all"
@@ -110,7 +125,7 @@ function TransactionsContent() {
 
         <button
           type="button"
-          onClick={fetchTransactions}
+          onClick={handleRetry}
           className="rounded-lg border border-[#d8c8b8] px-5 py-3 text-sm font-semibold text-[#684329] hover:bg-white"
         >
           Refresh
@@ -122,7 +137,7 @@ function TransactionsContent() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={fetchTransactions}
+            onClick={handleRetry}
             className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
           >
             Try Again
@@ -175,13 +190,14 @@ function TransactionsContent() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[#e9dfd4] bg-white shadow-sm">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1000px] text-left text-sm">
             <thead className="bg-[#f5eee7] text-[#684329]">
               <tr>
                 <th className="p-4">Service</th>
                 <th className="p-4">Customer</th>
                 <th className="p-4">Amount</th>
                 <th className="p-4">Appointment</th>
+                <th className="p-4">Stripe Reference</th>
                 <th className="p-4">Transaction Date</th>
                 <th className="p-4">Status</th>
               </tr>
@@ -226,6 +242,15 @@ function TransactionsContent() {
                               : "—"
                           } ${item.appointmentId.timeSlot || ""}`
                         : "—"}
+                    </td>
+
+                    <td className="p-4">
+                      <span
+                        className="break-all font-mono text-xs text-[#684329]"
+                        title={item.stripeSessionId || undefined}
+                      >
+                        {shortReference(item.stripeSessionId)}
+                      </span>
                     </td>
 
                     <td className="p-4">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetch, authenticatedFetchJson } from "@/lib/api";
 
 interface ServiceInfo {
   _id?: string;
@@ -40,32 +40,45 @@ function CustomerAppointmentsContent() {
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadAppointments = () =>
+    authenticatedFetchJson<{ data?: Appointment[] }>(
+      "/api/appointments/my"
+    ).then((result) => result.data || []);
 
-      const response = await authenticatedFetch("/api/appointments/my");
-      const result = await response.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load appointments.";
 
-      if (!response.ok) {
-        throw new Error(result.message || "Could not load appointments.");
-      }
+    setError(message);
+    toast.error(message);
+  };
 
-      setAppointments(result.data || []);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
+  const refreshAppointments = async () => {
+    const data = await loadAppointments();
+
+    setError("");
+    setAppointments(data);
   };
 
   useEffect(() => {
-    fetchAppointments();
+    loadAppointments()
+      .then((data) => {
+        setError("");
+        setAppointments(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadAppointments()
+      .then((data) => setAppointments(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const cancelAppointment = async () => {
     if (!cancelTarget) return;
@@ -86,7 +99,7 @@ function CustomerAppointmentsContent() {
 
       toast.success("Appointment cancelled successfully.");
       setCancelTarget(null);
-      await fetchAppointments();
+      await refreshAppointments();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong."
@@ -143,7 +156,7 @@ function CustomerAppointmentsContent() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={fetchAppointments}
+            onClick={handleRetry}
             className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
           >
             Try Again

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authenticatedFetch } from "@/lib/api";
-import { useSession } from "@/lib/auth-client";
+import { toast } from "sonner";
+import { authenticatedFetchJson } from "@/lib/api";
+import { useSession } from "@/lib/auth";
 
 interface Appointment {
   status: "pending" | "confirmed" | "cancelled";
@@ -37,31 +38,38 @@ function CustomerDashboardContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchAppointments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadAppointments = () =>
+    authenticatedFetchJson<{ data?: Appointment[] }>(
+      "/api/appointments/my"
+    ).then((result) => result.data || []);
 
-      const response = await authenticatedFetch("/api/appointments/my");
-      const result = await response.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load your dashboard.";
 
-      if (!response.ok) {
-        throw new Error(result.message || "Could not load your dashboard.");
-      }
-
-      setAppointments(result.data || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setError(message);
+    toast.error(message);
+  };
 
   useEffect(() => {
-    fetchAppointments();
-  }, [fetchAppointments]);
+    loadAppointments()
+      .then((data) => {
+        setError("");
+        setAppointments(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadAppointments()
+      .then((data) => setAppointments(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const stats = [
     {
@@ -116,7 +124,7 @@ function CustomerDashboardContent() {
             <span>{error}</span>
             <button
               type="button"
-              onClick={fetchAppointments}
+              onClick={handleRetry}
               className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
             >
               Try Again

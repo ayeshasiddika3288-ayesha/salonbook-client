@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { signOut, useSession } from "@/lib/auth-client";
+import { signOut, useSession } from "@/lib/auth";
+import { isBlockedUser } from "@/lib/auth-routing";
 
 interface UserWithRole {
   name?: string | null;
   email?: string | null;
   image?: string | null;
   role?: "customer" | "admin";
+  isBlocked?: boolean;
 }
 
 export default function Navbar() {
@@ -19,6 +21,8 @@ export default function Navbar() {
 
   const user = session?.user as UserWithRole | undefined;
   const role = user?.role;
+  const isBlocked = isBlockedUser(user);
+  const authenticated = !isPending && Boolean(session) && !isBlocked;
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -58,6 +62,13 @@ export default function Navbar() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isPending && isBlocked) {
+      void signOut();
+      toast.error("Your account has been blocked. Please contact support.");
+    }
+  }, [isPending, isBlocked]);
 
   const handleLogout = async () => {
     try {
@@ -106,9 +117,8 @@ export default function Navbar() {
             Services
           </Link>
 
-          {!isPending &&
-            (session ? (
-              <div className="relative" ref={dropdownRef}>
+          {authenticated ? (
+            <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setProfileOpen((open) => !open)}
@@ -210,7 +220,7 @@ export default function Navbar() {
                   Sign Up
                 </Link>
               </>
-            ))}
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -228,7 +238,7 @@ export default function Navbar() {
       {/* Mobile navigation */}
       {mobileOpen && (
         <div className="border-t border-[#e9dfd4] bg-[#faf7f2] px-5 py-4 md:hidden">
-          {session && (
+          {authenticated && (
             <div className="mb-4 flex items-center gap-3 border-b border-[#e9dfd4] pb-4">
               {user?.image ? (
                 <img
@@ -269,7 +279,7 @@ export default function Navbar() {
               Services
             </Link>
 
-            {session ? (
+            {authenticated ? (
               <>
                 <Link
                   href={dashboardHref}

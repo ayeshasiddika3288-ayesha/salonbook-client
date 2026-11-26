@@ -5,7 +5,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { useSession } from "@/lib/auth-client";
+import { signOut, useSession } from "@/lib/auth";
+import { isBlockedUser } from "@/lib/auth-routing";
 
 interface Service {
   _id: string;
@@ -33,7 +34,10 @@ function ServiceDetailsContent() {
   const router = useRouter();
 
   const { data: session, isPending } = useSession();
-  const user = session?.user as UserWithRole | undefined;
+  const user = session?.user as (UserWithRole & {
+    isBlocked?: boolean;
+  }) | undefined;
+  const isBlocked = isBlockedUser(user);
 
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,8 +53,14 @@ function ServiceDetailsContent() {
           `/services/${params.id}`
         )}`
       );
+      return;
     }
-  }, [session, isPending, router, params.id]);
+
+    if (isBlocked) {
+      void signOut();
+      router.replace("/auth/login");
+    }
+  }, [session, isPending, isBlocked, router, params.id]);
 
   useEffect(() => {
     const fetchService = async () => {
@@ -95,7 +105,11 @@ function ServiceDetailsContent() {
     setBookingError("");
 
     if (!session) {
-      router.push(`/auth/login?service=${service._id}`);
+      router.push(
+        `/auth/login?redirect=${encodeURIComponent(
+          `/services/${service._id}`
+        )}`
+      );
       return;
     }
 
@@ -119,7 +133,7 @@ function ServiceDetailsContent() {
           ← Back to Services
         </Link>
 
-        {isPending || !session ? (
+        {isPending || !session || isBlocked ? (
           <div className="py-24 text-center">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#e5dbcf] border-t-[#8b5e3c]" />
             <p className="mt-4 text-sm text-[#8b5e3c]">

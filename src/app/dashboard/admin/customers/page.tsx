@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetch, authenticatedFetchJson } from "@/lib/api";
 
 interface Customer {
   _id: string;
@@ -24,32 +24,45 @@ function AdminCustomersContent() {
   const [blockTarget, setBlockTarget] = useState<Customer | null>(null);
   const [error, setError] = useState("");
 
-  const fetchCustomers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadCustomers = () =>
+    authenticatedFetchJson<{ data?: Customer[] }>("/api/users").then(
+      (result) => result.data || []
+    );
 
-      const response = await authenticatedFetch("/api/users");
-      const result = await response.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load customers.";
 
-      if (!response.ok) {
-        throw new Error(result.message || "Could not load customers.");
-      }
+    setError(message);
+    toast.error(message);
+  };
 
-      setCustomers(result.data || []);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refreshCustomers = async () => {
+    const data = await loadCustomers();
+
+    setError("");
+    setCustomers(data);
+  };
 
   useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+    loadCustomers()
+      .then((data) => {
+        setError("");
+        setCustomers(data);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadCustomers()
+      .then((data) => setCustomers(data))
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const confirmToggleBlock = async () => {
     if (!blockTarget) return;
@@ -79,7 +92,7 @@ function AdminCustomersContent() {
       );
 
       setBlockTarget(null);
-      await fetchCustomers();
+      await refreshCustomers();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong."
@@ -158,7 +171,7 @@ function AdminCustomersContent() {
 
           <button
             type="button"
-            onClick={fetchCustomers}
+            onClick={handleRetry}
             className="rounded-lg border border-[#d8c8b8] px-4 py-2 text-sm font-semibold text-[#684329] hover:bg-white"
           >
             Refresh

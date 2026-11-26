@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetch, authenticatedFetchJson } from "@/lib/api";
 
 interface Appointment {
   _id: string;
@@ -21,11 +21,20 @@ interface Transaction {
   amount: number;
   currency: string;
   status: string;
+  stripeSessionId?: string | null;
   createdAt: string;
 }
 
 const normalizeStatus = (status: string) =>
   status === "paid" || status === "completed" ? "paid" : "failed";
+
+const shortReference = (value?: string | null) => {
+  if (!value) return "—";
+
+  return value.length > 18
+    ? `${value.slice(0, 12)}…${value.slice(-6)}`
+    : value;
+};
 
 function PaymentsContent() {
   const searchParams = useSearchParams();
@@ -37,46 +46,53 @@ function PaymentsContent() {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadData = async () => {
+    const [appointmentResult, transactionResult] = await Promise.all([
+      authenticatedFetchJson<{ data?: Appointment[] }>(
+        "/api/appointments/my"
+      ),
+      authenticatedFetchJson<{ data?: Transaction[] }>(
+        "/api/payments/my-transactions"
+      ),
+    ]);
 
-      const [appointmentResponse, transactionResponse] = await Promise.all([
-        authenticatedFetch("/api/appointments/my"),
-        authenticatedFetch("/api/payments/my-transactions"),
-      ]);
+    return {
+      appointments: appointmentResult.data || [],
+      transactions: transactionResult.data || [],
+    };
+  };
 
-      const appointmentResult = await appointmentResponse.json();
-      const transactionResult = await transactionResponse.json();
+  const showError = (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : "Could not load payment data.";
 
-      if (!appointmentResponse.ok) {
-        throw new Error(
-          appointmentResult.message || "Could not load appointments."
-        );
-      }
-
-      if (!transactionResponse.ok) {
-        throw new Error(
-          transactionResult.message || "Could not load payment history."
-        );
-      }
-
-      setAppointments(appointmentResult.data || []);
-      setTransactions(transactionResult.data || []);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
+    setError(message);
+    toast.error(message);
   };
 
   useEffect(() => {
-    fetchData();
+    loadData()
+      .then((data) => {
+        setError("");
+        setAppointments(data.appointments);
+        setTransactions(data.transactions);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError("");
+
+    loadData()
+      .then((data) => {
+        setAppointments(data.appointments);
+        setTransactions(data.transactions);
+      })
+      .catch(showError)
+      .finally(() => setLoading(false));
+  };
 
   const startPayment = async (id: string) => {
     try {
@@ -135,7 +151,7 @@ function PaymentsContent() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={fetchData}
+            onClick={handleRetry}
             className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
           >
             Try Again
@@ -243,6 +259,12 @@ function PaymentsContent() {
                     </h3>
                     <p className="mt-1 break-all text-xs text-[#8b8178]">
                       Transaction: {item._id}
+                    </p>
+                    <p
+                      className="mt-1 break-all text-xs text-[#8b8178]"
+                      title={item.stripeSessionId || undefined}
+                    >
+                      Stripe reference: {shortReference(item.stripeSessionId)}
                     </p>
                   </div>
 

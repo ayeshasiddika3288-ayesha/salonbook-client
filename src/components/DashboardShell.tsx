@@ -3,8 +3,9 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
-import { signOut, useSession } from "@/lib/auth-client";
+import { signOut, useSession } from "@/lib/auth";
 
 interface DashboardShellProps {
   children: ReactNode;
@@ -82,14 +83,22 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     if (isPending) return;
 
     if (!session) {
+      // Read the live browser URL in the effect so query state survives login
+      // without making this shared shell a useSearchParams CSR boundary.
+      const currentPath =
+        typeof window === "undefined"
+          ? pathname
+          : `${window.location.pathname}${window.location.search}`;
+
       router.replace(
-        `/auth/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`
+        `/auth/login?redirect=${encodeURIComponent(currentPath || "/dashboard")}`
       );
       return;
     }
 
     if (isBlocked) {
       void signOut();
+      toast.error("Your account has been blocked. Please contact support.");
       router.replace("/auth/login");
       return;
     }

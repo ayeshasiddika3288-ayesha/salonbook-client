@@ -1,25 +1,57 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { signIn } from "@/lib/auth-client";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { authClient, signIn, signOut } from "@/lib/auth";
+import type { UserWithRole } from "@/lib/auth";
+import {
+  isBlockedUser,
+  resolveAuthRedirect,
+  resolveSocialRedirect,
+  toClientCallbackURL,
+} from "@/lib/auth-routing";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: "Google sign-in was cancelled.",
+  user_blocked: "Your account has been blocked. Please contact support.",
+  USER_BLOCKED: "Your account has been blocked. Please contact support.",
+  provider_not_found: "Google sign-in is not configured.",
+};
+
+const formatOAuthError = (
+  code: string | null,
+  description: string | null
+): string => {
+  if (!code) return "";
+
+  return (
+    OAUTH_ERROR_MESSAGES[code] ||
+    description ||
+    code.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  );
+};
 
 function LoginContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const redirectTo = searchParams.get("redirect");
   const registered = searchParams.get("registered") === "1";
+  const oauthError = formatOAuthError(
+    searchParams.get("error"),
+    searchParams.get("error_description")
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const target =
-    redirectTo && redirectTo.startsWith("/")
-      ? redirectTo
-      : "/dashboard";
+  useEffect(() => {
+    if (oauthError) toast.error(oauthError);
+  }, [oauthError]);
 
   const handleGoogleLogin = async () => {
     if (loading) return;
@@ -28,21 +60,33 @@ function LoginContent() {
     setLoading(true);
 
     try {
+      // The role is only known after the OAuth callback, so keep only safe
+      // app paths and let /dashboard route by role.
+      const callbackURL = toClientCallbackURL(
+        resolveSocialRedirect(redirectTo)
+      );
+
       const result = await signIn.social({
         provider: "google",
-        callbackURL: `${window.location.origin}${target}`,
+        callbackURL,
+        errorCallbackURL: toClientCallbackURL("/auth/login"),
       });
 
       if (result?.error) {
-        setError(
+        const message =
           result.error.message ||
-            "Google sign-in is not available right now."
-        );
+          "Google sign-in is not available right now.";
+
+        setError(message);
+        toast.error(message);
         setLoading(false);
       }
     } catch (error) {
       console.error("Google login error:", error);
-      setError("Google sign-in failed. Please try again.");
+      const message = "Google sign-in failed. Please try again.";
+
+      setError(message);
+      toast.error(message);
       setLoading(false);
     }
   };
@@ -64,17 +108,43 @@ function LoginContent() {
       });
 
       if (result.error) {
-        setError(
-          result.error.message || "Login failed. Please try again."
-        );
+        const message =
+          result.error.message || "Login failed. Please try again.";
+
+        setError(message);
+        toast.error(message);
         setLoading(false);
         return;
       }
 
-      window.location.assign(target);
+      // The session carries the latest role and blocked status from the DB.
+      const session = await authClient.getSession();
+      const user = (session.data?.user ||
+        result.data?.user) as UserWithRole | undefined;
+
+      if (isBlockedUser(user)) {
+        await signOut();
+
+        const message =
+          "Your account has been blocked. Please contact support.";
+
+        setError(message);
+        toast.error(message);
+        setLoading(false);
+        return;
+      }
+
+      const destination = resolveAuthRedirect(redirectTo, user?.role);
+
+      toast.success("Signed in successfully.");
+      router.replace(destination);
+      router.refresh();
     } catch (error) {
       console.error("Login error:", error);
-      setError("Something went wrong. Please try again.");
+      const message = "Something went wrong. Please try again.";
+
+      setError(message);
+      toast.error(message);
       setLoading(false);
     }
   };
@@ -100,6 +170,15 @@ function LoginContent() {
             className="mt-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
           >
             Account created successfully! Please sign in.
+          </p>
+        )}
+
+        {oauthError && (
+          <p
+            role="alert"
+            className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {oauthError}
           </p>
         )}
 
