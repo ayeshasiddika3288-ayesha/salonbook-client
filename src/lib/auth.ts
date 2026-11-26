@@ -9,10 +9,18 @@ import {
 // Auth stays on the client origin: next.config.ts proxies /api/auth/* to the
 // Express API. Use the configured client URL when present, otherwise fall back
 // to the same-origin /api/auth path. Never use the server URL here.
-const clientURL = (process.env.NEXT_PUBLIC_CLIENT_URL || "").replace(
+const apiURL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
+const configuredClientURL = (process.env.NEXT_PUBLIC_CLIENT_URL || "").replace(
   /\/+$/,
   ""
 );
+
+// Guard against a misconfigured NEXT_PUBLIC_CLIENT_URL that points at the API.
+// Same-origin is still the client in that case, so the fallback is correct.
+const clientURL =
+  configuredClientURL && configuredClientURL !== apiURL
+    ? configuredClientURL
+    : "";
 
 export const authClient = createAuthClient({
   ...(clientURL ? { baseURL: clientURL } : {}),
