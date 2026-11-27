@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { authClient, signIn, signOut } from "@/lib/auth";
+import { authClient, signIn, signOut, useSession } from "@/lib/auth";
 import type { UserWithRole } from "@/lib/auth";
 import {
   isBlockedUser,
@@ -22,8 +22,21 @@ const OAUTH_ERRORS: Record<string, string> = {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, isPending: sessionPending } = useSession();
 
   const redirectTo = searchParams.get("redirect");
+  const sessionUser = session?.user as UserWithRole | undefined;
+  const role = sessionUser?.role;
+  const signedIn = Boolean(session) && !isBlockedUser(sessionUser);
+
+  // A signed-in user has no reason to see the login form again, including via
+  // the browser's back button or a direct visit to /auth/login.
+  useEffect(() => {
+    if (sessionPending || !signedIn) return;
+
+    router.replace(resolveAuthRedirect(redirectTo, role));
+  }, [sessionPending, signedIn, redirectTo, role, router]);
+
   const registered = searchParams.get("registered") === "1";
   const errorCode = searchParams.get("error");
   const oauthError = errorCode
@@ -96,6 +109,21 @@ function LoginContent() {
       setLoading(false);
     }
   };
+
+  if (sessionPending || signedIn) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f5f2] px-4">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#e5dbcf] border-t-[#8b5e3c]" />
+          <p className="mt-4 text-sm font-medium text-[#8b5e3c]">
+            {signedIn
+              ? "You are already signed in. Redirecting..."
+              : "Checking sign in..."}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f8f5f2] px-4 py-10">
