@@ -37,8 +37,7 @@ function createAuth() {
   const client = getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "salonbook");
   const baseURL =
-    process.env.BETTER_AUTH_URL ||
-    process.env.NEXT_PUBLIC_CLIENT_URL ||
+    process.env.NEXT_PUBLIC_CLIENT_URL?.replace(/\/+$/, "") ||
     "http://localhost:3000";
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;

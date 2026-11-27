@@ -20,7 +20,7 @@ Single-package Next.js 16 App Router app (`src/`, `@/*` → `src/*`), React 19, 
 
 ## Env / API boundary
 
-- Copy `.env.example` → `.env.local`. Auth needs `MONGODB_URI`, `BETTER_AUTH_SECRET`, optional `BETTER_AUTH_URL`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; the dashboard proxy uses `NEXT_PUBLIC_API_URL`. `.env*` is gitignored except `.env.example`.
+- Copy `.env.example` → `.env.local`. Auth needs `MONGODB_URI`, `BETTER_AUTH_SECRET`, optional `NEXT_PUBLIC_CLIENT_URL`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; the dashboard proxy uses `NEXT_PUBLIC_API_URL`. `.env*` is gitignored except `.env.example`.
 - `next.config.ts` rewrites `/api/:path*` to `NEXT_PUBLIC_API_URL` for dashboard data; local route handlers (notably `/api/auth/*`) take precedence, so keep auth at `/api/auth/[...all]`. Fetch relative `/api/...` paths.
 - `NEXT_PUBLIC_*` values are inlined at build time — rebuild/redeploy after changing them.
 
