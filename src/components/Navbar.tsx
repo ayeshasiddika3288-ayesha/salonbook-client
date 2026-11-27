@@ -197,7 +197,7 @@ export default function Navbar() {
                       onClick={handleLogout}
                       className="mt-1 block w-full border-t border-[#f0e8de] px-4 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
                     >
-                      Log Out
+                      Logout
                     </button>
                   </div>
                 )}
@@ -209,7 +209,7 @@ export default function Navbar() {
                   onClick={closeMenus}
                   className="transition hover:text-[#8b5e3c]"
                 >
-                  Log In
+                  Login
                 </Link>
 
                 <Link
@@ -217,7 +217,7 @@ export default function Navbar() {
                   onClick={closeMenus}
                   className="rounded-lg bg-[#684329] px-4 py-2 text-white transition hover:bg-[#8b5e3c]"
                 >
-                  Sign Up
+                  Register
                 </Link>
               </>
           )}
@@ -312,7 +312,7 @@ export default function Navbar() {
                   onClick={handleLogout}
                   className="mt-2 rounded-lg bg-red-50 px-3 py-2.5 text-left font-semibold text-red-600 hover:bg-red-100"
                 >
-                  Log Out
+                  Logout
                 </button>
               </>
             ) : (
@@ -322,7 +322,7 @@ export default function Navbar() {
                   onClick={closeMenus}
                   className="rounded-lg border border-[#d8c8b8] px-3 py-2.5 text-center font-semibold text-[#684329] hover:bg-white"
                 >
-                  Log In
+                  Login
                 </Link>
 
                 <Link
@@ -330,7 +330,7 @@ export default function Navbar() {
                   onClick={closeMenus}
                   className="rounded-lg bg-[#684329] px-3 py-2.5 text-center font-semibold text-white hover:bg-[#8b5e3c]"
                 >
-                  Sign Up
+                  Register
                 </Link>
               </div>
             )}

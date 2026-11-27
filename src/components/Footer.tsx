@@ -50,10 +50,10 @@ export default function Footer() {
               Browse Services
             </Link>
             <Link href="/auth/login" className="hover:text-white">
-              Sign In
+              Login
             </Link>
             <Link href="/auth/register" className="hover:text-white">
-              Sign Up
+              Register
             </Link>
           </div>
         </div>
