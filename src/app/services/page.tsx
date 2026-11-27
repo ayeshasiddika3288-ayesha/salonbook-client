@@ -7,8 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 interface Service {
   _id: string;
   serviceName: string;
@@ -31,11 +29,7 @@ function ServicesContent({ categoryParam }: { categoryParam: string }) {
   const [error, setError] = useState("");
 
   const loadServices = () => {
-    if (!API_URL) {
-      return Promise.reject(new Error("API URL is not configured."));
-    }
-
-    return fetch(`${API_URL}/api/services`).then(async (response) => {
+    return fetch("/api/services").then(async (response) => {
       const result = await response.json();
 
       if (!response.ok || !result.success) {

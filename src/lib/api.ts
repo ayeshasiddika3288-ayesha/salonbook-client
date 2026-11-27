@@ -2,16 +2,10 @@
 
 import { authClient } from "./auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export async function authenticatedFetch(
   path: string,
   options: RequestInit = {}
 ) {
-  if (!API_URL) {
-    throw new Error("API URL is not configured.");
-  }
-
   const { data, error } = await authClient.token();
 
   if (error || !data?.token) {
@@ -31,7 +25,7 @@ export async function authenticatedFetch(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(path, {
     ...options,
     headers,
     credentials: "include",

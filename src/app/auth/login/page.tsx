@@ -10,7 +10,6 @@ import {
   isBlockedUser,
   resolveAuthRedirect,
   resolveSocialRedirect,
-  toClientCallbackURL,
 } from "@/lib/auth-routing";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -62,14 +61,12 @@ function LoginContent() {
     try {
       // The role is only known after the OAuth callback, so keep only safe
       // app paths and let /dashboard route by role.
-      const callbackURL = toClientCallbackURL(
-        resolveSocialRedirect(redirectTo)
-      );
+      const callbackURL = resolveSocialRedirect(redirectTo);
 
       const result = await signIn.social({
         provider: "google",
         callbackURL,
-        errorCallbackURL: toClientCallbackURL("/auth/login"),
+        errorCallbackURL: "/auth/login",
       });
 
       if (result?.error) {

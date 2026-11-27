@@ -10,10 +10,7 @@ import {
   getRoleHome,
   isBlockedUser,
   resolveSocialRedirect,
-  toClientCallbackURL,
 } from "@/lib/auth-routing";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -75,14 +72,12 @@ export default function RegisterPage() {
     try {
       const result = await signIn.social({
         provider: "google",
-        callbackURL: toClientCallbackURL(
-          resolveSocialRedirect(
-            typeof window === "undefined"
-              ? null
-              : new URLSearchParams(window.location.search).get("redirect")
-          )
+        callbackURL: resolveSocialRedirect(
+          typeof window === "undefined"
+            ? null
+            : new URLSearchParams(window.location.search).get("redirect")
         ),
-        errorCallbackURL: toClientCallbackURL("/auth/login"),
+        errorCallbackURL: "/auth/login",
       });
 
       if (result?.error) {
@@ -178,24 +173,17 @@ export default function RegisterPage() {
       // Upload selected image before creating the account. A chosen file takes
       // priority over a pasted URL.
       if (image) {
-        if (!API_URL) {
-          throw new Error("Server URL is not configured.");
-        }
-
         const imageData = await fileToBase64(image);
 
-        const uploadResponse = await fetch(
-          `${API_URL}/api/uploads/register`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              image: imageData,
-            }),
-          }
-        );
+        const uploadResponse = await fetch("/api/uploads/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: imageData,
+          }),
+        });
 
         const uploadResult = await uploadResponse.json();
 

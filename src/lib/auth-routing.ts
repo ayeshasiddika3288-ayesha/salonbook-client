@@ -78,9 +78,3 @@ export function resolveSocialRedirect(
     : "/dashboard";
 }
 
-/** Better Auth social callbacks need an absolute URL. */
-export function toClientCallbackURL(path: string): string {
-  if (typeof window === "undefined") return path;
-
-  return `${window.location.origin}${path}`;
-}

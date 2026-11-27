@@ -16,8 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 interface Service {
   _id: string;
   serviceName: string;
@@ -120,11 +118,7 @@ export default function HomePage() {
         setLoading(true);
         setError("");
 
-        if (!API_URL) {
-          throw new Error("API URL is not configured.");
-        }
-
-        const response = await fetch(`${API_URL}/api/services`, {
+        const response = await fetch("/api/services", {
           cache: "no-store",
         });
 

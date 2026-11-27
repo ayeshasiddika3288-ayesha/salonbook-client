@@ -7,12 +7,10 @@ const nextConfig: NextConfig = {
 
     if (!apiUrl) return [];
 
-    // Keep auth on the client origin so OAuth callbacks and session cookies
-    // use the client URL, while the Express API still handles the requests.
     return [
       {
-        source: "/api/auth/:path*",
-        destination: `${apiUrl}/api/auth/:path*`,
+        source: "/api/:path*",
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },

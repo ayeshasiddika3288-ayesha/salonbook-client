@@ -77,7 +77,7 @@ npm start
 
 | Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | Base URL of the SalonBook server API (also the `/api/auth/*` rewrite target) |
+| `NEXT_PUBLIC_API_URL` | Base URL of the SalonBook server API and target of the client `/api/*` rewrite |
 | `NEXT_PUBLIC_CLIENT_URL` | Client origin used by the auth client (falls back to same-origin `/api/auth`) |
 
 > All sensitive keys (MongoDB, Better Auth secret, Stripe, ImgBB) live only on the server. Never commit `.env.local` or secret values.
@@ -129,7 +129,7 @@ npm start
 
 1. Import this repository in Vercel and keep the auto-detected **Next.js** preset.
 2. Add the environment variables:
-   - `NEXT_PUBLIC_API_URL` → your deployed Express server URL (no trailing slash). It is also the target of the `/api/auth/*` rewrite, which keeps auth on the client domain.
+   - `NEXT_PUBLIC_API_URL` → your deployed Express server URL (no trailing slash). It is also the target of the `/api/*` rewrite, which keeps browser API requests on the client domain.
    - `NEXT_PUBLIC_CLIENT_URL` → your deployed client URL (no trailing slash), used by the auth client.
 3. Deploy, then copy the Vercel domain into the server configuration below.
 4. Re-deploy after changing any `NEXT_PUBLIC_*` variable — they are inlined at build time.

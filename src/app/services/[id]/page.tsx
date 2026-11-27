@@ -68,15 +68,7 @@ function ServiceDetailsContent() {
         setLoading(true);
         setError("");
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-        if (!apiUrl) {
-          throw new Error("API URL is not configured.");
-        }
-
-        const response = await fetch(
-          `${apiUrl}/api/services/${params.id}`
-        );
+        const response = await fetch(`/api/services/${params.id}`);
 
         const result: ServiceResponse = await response.json();
 
